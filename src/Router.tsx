@@ -1,6 +1,5 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { AppLayout } from './components/AppLayout';
-import { AppProvider } from './store/AppContext';
 import { AnalysisPage } from './pages/Analysis.page';
 import { ExperimentsPage } from './pages/Experiments.page';
 import { ExportPage } from './pages/Export.page';
@@ -11,13 +10,9 @@ import { SolutionsPage } from './pages/Solutions.page';
 
 const router = createBrowserRouter([
   {
-    element: (
-      <AppProvider>
-        <AppLayout />
-      </AppProvider>
-    ),
+    element: <AppLayout />,
     children: [
-      { index: true, element: <Navigate to="/materials" replace /> },
+      { index: true, element: <Navigate to="/organization" replace /> },
       { path: 'materials', element: <MaterialsPage /> },
       { path: 'solutions', element: <SolutionsPage /> },
       { path: 'experiments', element: <ExperimentsPage /> },

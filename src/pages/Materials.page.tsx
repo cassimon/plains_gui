@@ -68,8 +68,7 @@ export function MaterialsPage() {
   const addMaterial = () => {
     const m = newMaterial();
     setMaterials((prev) => [...prev, m]);
-    setEditingId(m.id);
-    setEditBuffer(m);
+    // Row is added inactive — user clicks the pencil icon to start editing
   };
 
   const startEdit = (m: Material) => {

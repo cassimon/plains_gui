@@ -69,19 +69,21 @@ export type CanvasTextElement = {
   position: Vec2;
   size: Vec2;
   content: string;
+  color?: string;
 };
 
 export type CanvasLineElement = {
   id: string;
   type: 'line';
   points: Vec2[]; // sequence of absolute canvas coordinates
+  color?: string;
 };
 
 /**
  * A Collection is a named folder placed on the canvas that groups references
  * to Materials, Solutions and (extensibly) other app entities.
  */
-export type CollectionRef = { kind: 'material' | 'solution'; id: string };
+export type CollectionRef = { kind: 'material' | 'solution' | 'experiment' | 'result' | 'analysis'; id: string };
 
 export type CanvasCollectionElement = {
   id: string;
@@ -90,6 +92,7 @@ export type CanvasCollectionElement = {
   size: Vec2;
   name: string;
   refs: CollectionRef[];
+  color?: string;
 };
 
 export type CanvasElement =
@@ -112,7 +115,8 @@ function newTextElement(position: Vec2): CanvasTextElement {
 }
 
 function newLineElement(start: Vec2): CanvasLineElement {
-  return { id: crypto.randomUUID(), type: 'line', points: [start] };
+  // Initialize with two points so the line is immediately visible during drag
+  return { id: crypto.randomUUID(), type: 'line', points: [start, { ...start }] };
 }
 
 function newCollectionElement(position: Vec2): CanvasCollectionElement {

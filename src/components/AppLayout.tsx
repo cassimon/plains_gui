@@ -35,6 +35,9 @@ export function AppLayout() {
         col.refs.forEach((r) => {
           if (r.kind === 'material') lit.add('/materials');
           if (r.kind === 'solution') lit.add('/solutions');
+          if (r.kind === 'experiment') lit.add('/experiments');
+          if (r.kind === 'result') lit.add('/results');
+          if (r.kind === 'analysis') lit.add('/analysis');
         });
         return lit;
       }
