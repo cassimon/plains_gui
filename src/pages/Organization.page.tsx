@@ -28,6 +28,7 @@ import {
   IconDownload,
   IconFlask,
   IconFolderPlus,
+  IconHandGrab,
   IconItalic,
   IconLetterT,
   IconMinus,
@@ -1813,7 +1814,7 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
       >
         <Tooltip label="Select / Pan (or hold Space)" position="bottom">
           <ActionIcon variant={tool === 'select' ? 'filled' : 'subtle'} style={toolStyle('select')} onClick={() => setTool('select')}>
-            ⬡
+            <IconHandGrab size={18} />
           </ActionIcon>
         </Tooltip>
         <Tooltip label="Add sticky note" position="bottom">
