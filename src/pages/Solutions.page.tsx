@@ -156,10 +156,19 @@ type SolutionCardProps = {
   materialOptions: { value: string; label: string }[];
   getMaterialName: (id: string) => string;
   collectionColor?: string;
+  isSelected?: boolean;
+  onSelect?: (id: string) => void;
 };
 
-function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMaterialName, collectionColor }: SolutionCardProps) {
+function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMaterialName, collectionColor, isSelected, onSelect }: SolutionCardProps) {
   const [open, setOpen] = useState(false);
+
+  const handleToggleOpen = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (newOpen && onSelect) {
+      onSelect(solution.id);
+    }
+  };
   const [editingName, setEditingName] = useState(false);
   const [nameBuffer, setNameBuffer] = useState(solution.name);
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
@@ -217,7 +226,7 @@ function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMateri
             size="sm"
             variant="subtle"
             color="gray"
-            onClick={() => setOpen((o) => !o)}
+            onClick={() => handleToggleOpen(!open)}
             aria-label={open ? 'Collapse' : 'Expand'}
           >
             {open ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
@@ -244,7 +253,7 @@ function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMateri
               <Text
                 fw={600}
                 style={{ cursor: 'pointer' }}
-                onClick={() => setOpen((o) => !o)}
+                onClick={() => handleToggleOpen(!open)}
               >
                 {solution.name}
               </Text>
@@ -320,8 +329,14 @@ function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMateri
 // ── Solutions page ────────────────────────────────────────────────────────────
 
 export function SolutionsPage() {
-  const { materials, solutions, setSolutions, planes, updateElement, pendingCollectionLink, setPendingCollectionLink, activeCollectionId, activePlaneId } = useAppContext();
+  const { materials, solutions, setSolutions, planes, updateElement, pendingCollectionLink, setPendingCollectionLink, activeCollectionId, activePlaneId, setActiveEntity } = useAppContext();
   const { getEntityColor, isEntityVisible } = useEntityCollection();
+  const [selectedSolutionId, setSelectedSolutionId] = useState<string | null>(null);
+
+  const selectSolution = (id: string | null) => {
+    setSelectedSolutionId(id);
+    setActiveEntity(id ? { kind: 'solution', id } : null);
+  };
 
   const materialOptions = materials.map((m) => ({
     value: m.id,
@@ -380,7 +395,12 @@ export function SolutionsPage() {
       children: <Text size="sm">Are you sure you want to delete this solution? This cannot be undone.</Text>,
       labels: { confirm: 'Delete', cancel: 'Cancel' },
       confirmProps: { color: 'red' },
-      onConfirm: () => setSolutions((prev) => prev.filter((s) => s.id !== id)),
+      onConfirm: () => {
+        setSolutions((prev) => prev.filter((s) => s.id !== id));
+        if (id === selectedSolutionId) {
+          selectSolution(null);
+        }
+      },
     });
   };
 
@@ -417,6 +437,8 @@ export function SolutionsPage() {
             materialOptions={materialOptions}
             getMaterialName={getMaterialName}
             collectionColor={getEntityColor('solution', solution.id) ?? undefined}
+            isSelected={selectedSolutionId === solution.id}
+            onSelect={selectSolution}
           />
         ))}
       </Stack>

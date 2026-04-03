@@ -12,4 +12,8 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
   },
+
+  optimizeDeps: {
+    include: ['plotly.js/dist/plotly-basic'],
+  },
 });

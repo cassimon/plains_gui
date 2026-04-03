@@ -30,12 +30,204 @@ export function newMaterial(): Material {
 
 // ── Experiment ───────────────────────────────────────────────────────────────
 
+/** Process parameter mode: constant value or varied across substrates */
+export type ParamMode = 'constant' | 'variation';
+
+/** A single process parameter with its value and mode */
+export type ProcessParam = {
+  value: string;
+  mode: ParamMode;
+  // variationValues stored separately when needed
+};
+
+/** Deposition/processing layer in an experiment */
+export type ExperimentLayer = {
+  id: string;
+  name: string;
+  color: string;
+  materialId?: string; // reference to Material
+  solutionId?: string; // reference to Solution
+  // Process parameters - all optional, encourage adding over requiring
+  depositionMethod?: ProcessParam;
+  substrateTemp?: ProcessParam;
+  depositionAtmosphere?: ProcessParam;
+  solutionVolume?: ProcessParam;
+  dryingMethod?: ProcessParam;
+  annealingTime?: ProcessParam;
+  annealingTemp?: ProcessParam;
+  annealingAtmosphere?: ProcessParam;
+  notes?: string;
+};
+
+/** Architecture type for solar cell devices */
+export type DeviceArchitecture = 'n-i-p' | 'p-i-n' | 'n-i-p-n' | 'p-i-n-p' | 'custom';
+
+/** A single substrate in an experiment */
+export type Substrate = {
+  id: string;
+  name: string; // e.g. "A1", "A2", "B1"
+  notes?: string;
+  // Per-substrate parameter values for variation mode
+  // Key format: "layerId:paramName", Value: string
+  parameterValues?: { [key: string]: string };
+};
+
 export type Experiment = {
   id: string;
   name: string;
   description: string;
-  date: string; // ISO date string
+  date: string; // fabrication date (ISO string)
+  endDate?: string; // optional completion date
+  // Device configuration
+  architecture: DeviceArchitecture;
+  substrateMaterial: string;
+  substrateWidth: number; // cm
+  substrateLength: number; // cm
+  numSubstrates: number;
+  devicesPerSubstrate: number;
+  deviceArea: number; // cm²
+  buildDevices: boolean; // whether to build the device layout
+  deviceLayoutImage?: string; // base64 encoded image (jpg/png)
+  // Layer stack (ordered from substrate up)
+  layers: ExperimentLayer[];
+  // Substrates in the experiment
+  substrates: Substrate[];
+  // Results uploaded (makes experiment "Finished")
+  hasResults: boolean;
 };
+
+/** Fields required for an experiment to be 'ready' */
+export function getExperimentMissingFields(exp: Experiment): string[] {
+  const missing: string[] = [];
+  if (!exp.name.trim()) missing.push('name');
+  if (!exp.date) missing.push('date');
+  if (!exp.numSubstrates || exp.numSubstrates < 1) missing.push('numSubstrates');
+  return missing;
+}
+
+/** Compute experiment status */
+export function getExperimentStatus(exp: Experiment): 'incomplete' | 'ready' | 'finished' {
+  if (exp.hasResults) return 'finished';
+  if (getExperimentMissingFields(exp).length === 0) return 'ready';
+  return 'incomplete';
+}
+
+/**
+ * Get all parameters marked for variation across all layers.
+ * Returns array of { layerId, layerName, paramName, paramKey }
+ */
+export function getVariedParameters(exp: Experiment): Array<{
+  layerId: string;
+  layerName: string;
+  paramName: string;
+  paramKey: string; // "layerId:paramName"
+}> {
+  const varied: Array<{ layerId: string; layerName: string; paramName: string; paramKey: string }> = [];
+  const PARAM_KEYS = [
+    'depositionMethod', 'substrateTemp', 'depositionAtmosphere', 'solutionVolume',
+    'dryingMethod', 'annealingTime', 'annealingTemp', 'annealingAtmosphere',
+  ] as const;
+
+  exp.layers.forEach((layer) => {
+    PARAM_KEYS.forEach((paramKey) => {
+      const param = layer[paramKey as keyof typeof layer] as ProcessParam | undefined;
+      if (param && param.mode === 'variation') {
+        varied.push({
+          layerId: layer.id,
+          layerName: layer.name,
+          paramName: paramKey.replace(/([A-Z])/g, ' $1').trim(),
+          paramKey: `${layer.id}:${paramKey}`,
+        });
+      }
+    });
+  });
+
+  return varied;
+}
+
+const LAYER_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+  '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2',
+];
+
+export function newLayer(index: number): ExperimentLayer {
+  return {
+    id: crypto.randomUUID(),
+    name: `Layer ${index + 1}`,
+    color: LAYER_COLORS[index % LAYER_COLORS.length],
+  };
+}
+
+/**
+ * Generate substrate names based on parameters (like Streamlit app)
+ * Supports: date_expname_user format with automatic deduplication
+ */
+export function generateSubstrates(
+  count: number,
+  options?: {
+    date?: string;
+    experimentName?: string;
+    userName?: string;
+    includeDate?: boolean;
+    includeExpName?: boolean;
+    includeUser?: boolean;
+  }
+): Substrate[] {
+  const {
+    date,
+    experimentName,
+    userName,
+    includeDate = true,
+    includeExpName = true,
+    includeUser = false,
+  } = options ?? {};
+
+  const substrates: Substrate[] = [];
+  const nameCounts: Record<string, number> = {};
+
+  for (let i = 1; i <= count; i++) {
+    const parts: string[] = [];
+
+    if (includeDate && date) parts.push(date);
+    if (includeExpName && experimentName) parts.push(experimentName.replace(/\s+/g, '_'));
+    if (includeUser && userName) parts.push(userName.replace(/\s+/g, '_'));
+
+    // If no parts selected, use index-based names (A1, A2, etc.)
+    if (parts.length === 0) {
+      const cols = Math.ceil(Math.sqrt(count));
+      const row = Math.floor((i - 1) / cols);
+      const col = (i - 1) % cols;
+      const rowLetter = String.fromCharCode(65 + row);
+      const colNumber = col + 1;
+      substrates.push({ id: crypto.randomUUID(), name: `${rowLetter}${colNumber}` });
+    } else {
+      const baseName = parts.join('_');
+      nameCounts[baseName] = (nameCounts[baseName] ?? 0) + 1;
+      const finalName = nameCounts[baseName] > 1 ? `${baseName}_${nameCounts[baseName]}` : baseName;
+      substrates.push({ id: crypto.randomUUID(), name: finalName });
+    }
+  }
+
+  return substrates;
+}
+
+/**
+ * Regenerate substrate names with same options, preserving IDs
+ */
+export function regenerateSubstrateNames(
+  existingSubstrates: Substrate[],
+  options?: {
+    date?: string;
+    experimentName?: string;
+    userName?: string;
+    includeDate?: boolean;
+    includeExpName?: boolean;
+    includeUser?: boolean;
+  }
+): Substrate[] {
+  const newSubstrates = generateSubstrates(existingSubstrates.length, options);
+  return existingSubstrates.map((sub, idx) => ({ ...newSubstrates[idx], id: sub.id }));
+}
 
 export function newExperiment(): Experiment {
   return {
@@ -43,6 +235,17 @@ export function newExperiment(): Experiment {
     name: 'New Experiment',
     description: '',
     date: new Date().toISOString().slice(0, 10),
+    architecture: 'n-i-p',
+    substrateMaterial: 'Glass/ITO',
+    substrateWidth: 2.5,
+    substrateLength: 2.5,
+    numSubstrates: 1,
+    devicesPerSubstrate: 4,
+    deviceArea: 0.09,
+    buildDevices: false,
+    layers: [newLayer(0)],
+    substrates: generateSubstrates(1),
+    hasResults: false,
   };
 }
 
@@ -67,6 +270,92 @@ export function newSolution(): Solution {
 
 export function newComponent(): SolutionComponent {
   return { id: crypto.randomUUID(), materialId: '', amount: '', unit: 'mg' };
+}
+
+// ── Results ──────────────────────────────────────────────────────────────────
+
+/** Measurement type detected from file content/extension */
+export type MeasurementType =
+  | 'JV'
+  | 'Dark JV'
+  | 'IPCE'
+  | 'Stability (JV)'
+  | 'Stability (Tracking)'
+  | 'Stability (Parameters)'
+  | 'Document'
+  | 'Image'
+  | 'Archive'
+  | 'Unknown';
+
+/** A measurement file uploaded by the user */
+export type MeasurementFile = {
+  id: string;
+  fileName: string;
+  fileType: MeasurementType;
+  /** Device name extracted from filename/content (e.g., "AI44") */
+  deviceName: string;
+  /** Cell identifier if parsed (e.g., "1") */
+  cell: string;
+  /** Pixel identifier if parsed (e.g., "C") */
+  pixel: string;
+  /** File content as base64 for storage (optional for large files) */
+  content?: string;
+  /** Parsed value (e.g., PCE percentage) */
+  value?: number;
+  /** Date from measurement file */
+  measurementDate?: string;
+  /** User from measurement file */
+  user?: string;
+};
+
+/** A group of measurement files with the same device name */
+export type DeviceGroup = {
+  id: string;
+  deviceName: string;
+  files: MeasurementFile[];
+  /** Substrate ID this group is assigned to (null = unmatched) */
+  assignedSubstrateId: string | null;
+  /** Match quality score (0-1) for fuzzy matching */
+  matchScore?: number;
+};
+
+/** All results data for an experiment */
+export type ExperimentResults = {
+  id: string;
+  experimentId: string;
+  /** All uploaded measurement files */
+  files: MeasurementFile[];
+  /** File groups by device name */
+  deviceGroups: DeviceGroup[];
+  /** Grouping strategy used */
+  groupingStrategy: 'exact' | 'search' | 'fuzzy';
+  /** Matching strategy used */
+  matchingStrategy: 'fuzzy' | 'sequential' | 'manual';
+  /** Last updated timestamp */
+  updatedAt: string;
+};
+
+export function newMeasurementFile(fileName: string): MeasurementFile {
+  return {
+    id: crypto.randomUUID(),
+    fileName,
+    fileType: 'Unknown',
+    deviceName: '',
+    cell: '',
+    pixel: '',
+  };
+}
+
+export function newExperimentResults(experimentId: string): ExperimentResults {
+  return {
+    id: crypto.randomUUID(),
+    experimentId,
+    files: [],
+    deviceGroups: [],
+    groupingStrategy: 'search',
+    matchingStrategy: 'fuzzy',
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 // ── Organization / Canvas ─────────────────────────────────────────────────────
@@ -189,6 +478,8 @@ type AppContextValue = {
   setSolutions: React.Dispatch<React.SetStateAction<Solution[]>>;
   experiments: Experiment[];
   setExperiments: React.Dispatch<React.SetStateAction<Experiment[]>>;
+  results: ExperimentResults[];
+  setResults: React.Dispatch<React.SetStateAction<ExperimentResults[]>>;
   planes: Plane[];
 
   // ── Plane repository ──────────────────────────────────────────────────────
@@ -222,6 +513,10 @@ type AppContextValue = {
    */
   pendingCollectionLink: { collectionId: string; planeId: string; kind: CollectionRef['kind'] } | null;
   setPendingCollectionLink: (v: { collectionId: string; planeId: string; kind: CollectionRef['kind'] } | null) => void;
+
+  /** The single entity currently focused in a page's detail view */
+  activeEntity: { kind: 'experiment' | 'material' | 'solution'; id: string } | null;
+  setActiveEntity: (e: { kind: 'experiment' | 'material' | 'solution'; id: string } | null) => void;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -230,10 +525,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [solutions, setSolutions] = useState<Solution[]>([]);
   const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [results, setResults] = useState<ExperimentResults[]>([]);
   const [planes, setPlanes] = useState<Plane[]>([newPlane('Plane 1')]);
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [activePlaneId, setActivePlaneId] = useState<string | null>(null);
   const [pendingCollectionLink, setPendingCollectionLink] = useState<{ collectionId: string; planeId: string; kind: CollectionRef['kind'] } | null>(null);
+  const [activeEntity, setActiveEntity] = useState<{ kind: 'experiment' | 'material' | 'solution'; id: string } | null>(null);
 
   // ── Plane mutations ────────────────────────────────────────────────────────
 
@@ -331,6 +628,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setSolutions,
         experiments,
         setExperiments,
+        results,
+        setResults,
         planes,
         addPlane,
         updatePlane,
@@ -348,6 +647,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setActivePlaneId,
         pendingCollectionLink,
         setPendingCollectionLink,
+        activeEntity,
+        setActiveEntity,
       }}
     >
       {children}

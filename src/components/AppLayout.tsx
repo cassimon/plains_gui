@@ -22,7 +22,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
-  const { planes, activeCollectionId, setActiveCollectionId, activePlaneId, setActivePlaneId } = useAppContext();
+  const { planes, activeCollectionId, setActiveCollectionId, activePlaneId, setActivePlaneId, experiments, materials, solutions, activeEntity } = useAppContext();
 
   const currentPage = pages.find((p) => location.pathname.startsWith(p.value))?.value ?? pages[0].value;
 
@@ -51,6 +51,23 @@ export function AppLayout() {
   // Accent color: collection color if selected, otherwise neutral
   const accentColor = activeCollection?.color || DEFAULT_ACCENT;
 
+  // Resolve the active entity's display name and icon
+  const { entityName, EntityIcon } = useMemo(() => {
+    if (!activeEntity) return { entityName: null, EntityIcon: null };
+    let name: string | null = null;
+    if (activeEntity.kind === 'experiment') {
+      name = experiments.find((e) => e.id === activeEntity.id)?.name ?? null;
+    } else if (activeEntity.kind === 'material') {
+      name = materials.find((m) => m.id === activeEntity.id)?.name ?? null;
+    } else if (activeEntity.kind === 'solution') {
+      name = solutions.find((s) => s.id === activeEntity.id)?.name ?? null;
+    }
+    const iconPath = activeEntity.kind === 'experiment' ? '/experiments'
+      : activeEntity.kind === 'material' ? '/materials'
+      : '/solutions';
+    return { entityName: name, EntityIcon: pageIcons[iconPath as keyof typeof pageIcons] ?? null };
+  }, [activeEntity, experiments, materials, solutions]);
+
   // When on the Organization page and a collection is selected, compute which
   // page paths have refs in that collection — all others are dimmed.
   const litPaths = useMemo<Set<string> | null>(() => {
@@ -75,11 +92,17 @@ export function AppLayout() {
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between">
           <Group gap={4} align="center">
-            {/* Plane selector */}
+            {/* Plane name — click navigates to org and deselects collection */}
+            <UnstyledButton
+              onClick={() => { navigate('/organization'); setActiveCollectionId(null); }}
+              style={{ display: 'flex', alignItems: 'center' }}
+            >
+              <Text fw={600} size="lg">{activePlane?.name ?? '—'}</Text>
+            </UnstyledButton>
+            {/* Plane dropdown chevron only */}
             <Menu shadow="md" width={220}>
               <Menu.Target>
-                <UnstyledButton style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Text fw={600} size="lg">{activePlane?.name ?? '—'}</Text>
+                <UnstyledButton style={{ display: 'flex', alignItems: 'center', padding: '0 2px' }}>
                   <IconChevronDown size={14} style={{ color: 'var(--mantine-color-dimmed)' }} />
                 </UnstyledButton>
               </Menu.Target>
@@ -96,23 +119,21 @@ export function AppLayout() {
               </Menu.Dropdown>
             </Menu>
 
-            <Text c="dimmed">:</Text>
+            {/* Removed path separator */}
 
-            {/* Collection selector */}
+            {/* Collection name — no click */}
+            <Text
+              fw={600}
+              size="lg"
+              c={activeCollection ? undefined : 'dimmed'}
+              style={activeCollection ? { borderLeft: `3px solid ${accentColor}`, paddingLeft: 8 } : undefined}
+            >
+              {activeCollection?.name ?? 'No Collection'}
+            </Text>
+            {/* Collection dropdown chevron only */}
             <Menu shadow="md" width={240}>
               <Menu.Target>
-                <UnstyledButton
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    borderLeft: activeCollection ? `3px solid ${accentColor}` : undefined,
-                    paddingLeft: activeCollection ? 8 : 0,
-                  }}
-                >
-                  <Text fw={600} size="lg" c={activeCollection ? undefined : 'dimmed'}>
-                    {activeCollection?.name ?? 'No Collection'}
-                  </Text>
+                <UnstyledButton style={{ display: 'flex', alignItems: 'center', padding: '0 2px' }}>
                   <IconChevronDown size={14} style={{ color: 'var(--mantine-color-dimmed)' }} />
                 </UnstyledButton>
               </Menu.Target>
@@ -140,6 +161,15 @@ export function AppLayout() {
                 )}
               </Menu.Dropdown>
             </Menu>
+
+            {/* Active entity segment */}
+            {activeEntity && entityName && (
+              <>
+                {/* Removed path separator */}
+                {EntityIcon && <EntityIcon size={16} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />}
+                <Text fw={600} size="lg">{entityName}</Text>
+              </>
+            )}
           </Group>
           <ActionIcon
             variant="default"

@@ -43,12 +43,18 @@ function SortIcon({ sorted, direction }: { sorted: boolean; direction: 'asc' | '
 }
 
 export function MaterialsPage() {
-  const { materials, setMaterials, planes, updateElement, pendingCollectionLink, setPendingCollectionLink, activeCollectionId, activePlaneId } = useAppContext();
+  const { materials, setMaterials, planes, updateElement, pendingCollectionLink, setPendingCollectionLink, activeCollectionId, activePlaneId, setActiveEntity } = useAppContext();
   const { getEntityColor, isEntityVisible } = useEntityCollection();
   const [sort, setSort] = useState<SortState>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBuffer, setEditBuffer] = useState<Material | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
+
+  const selectMaterial = (id: string | null) => {
+    setSelectedMaterialId(id);
+    setActiveEntity(id ? { kind: 'material', id } : null);
+  };
 
   // Auto-create material + link to collection when navigated from action bubble
   useEffect(() => {
@@ -143,6 +149,9 @@ export function MaterialsPage() {
       onConfirm: () => {
         setMaterials((prev) => prev.filter((m) => !selected.has(m.id)));
         setSelected(new Set());
+        if (selectedMaterialId && selected.has(selectedMaterialId)) {
+          selectMaterial(null);
+        }
       },
     });
   };
@@ -223,6 +232,8 @@ export function MaterialsPage() {
                 <Table.Tr
                   key={material.id}
                   bg={selected.has(material.id) ? 'var(--mantine-color-blue-light)' : undefined}
+                  onClick={() => selectMaterial(material.id)}
+                  style={{ cursor: 'pointer' }}
                 >
                   <Table.Td style={{ padding: 0, width: 6, minWidth: 6, background: getEntityColor('material', material.id) ?? 'transparent' }} />
                   <Table.Td>
