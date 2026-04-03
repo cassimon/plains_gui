@@ -38,7 +38,7 @@ const COLUMNS: Column[] = [
 type SortState = { key: keyof Material; direction: 'asc' | 'desc' } | null;
 
 function SortIcon({ sorted, direction }: { sorted: boolean; direction: 'asc' | 'desc' }) {
-  if (!sorted) return <IconSelector size={14} />;
+  if (!sorted) {return <IconSelector size={14} />;}
   return direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />;
 }
 
@@ -58,8 +58,9 @@ export function MaterialsPage() {
 
   // Auto-create material + link to collection when navigated from action bubble
   useEffect(() => {
-    console.log('[MaterialsPage] useEffect fired, pendingCollectionLink:', pendingCollectionLink);
-    if (!pendingCollectionLink || pendingCollectionLink.kind !== 'material') return;
+    if (!pendingCollectionLink || pendingCollectionLink.kind !== 'material') {
+      return;
+    }
     const { collectionId, planeId } = pendingCollectionLink;
     setPendingCollectionLink(null);
 
@@ -91,7 +92,7 @@ export function MaterialsPage() {
   const sorted = [...materials]
     .filter((m) => isEntityVisible('material', m.id))
     .sort((a, b) => {
-      if (!sort) return 0;
+      if (!sort) {return 0;}
       const av = a[sort.key].toLowerCase();
       const bv = b[sort.key].toLowerCase();
       const cmp = av.localeCompare(bv);
@@ -120,7 +121,7 @@ export function MaterialsPage() {
   };
 
   const commitEdit = () => {
-    if (!editBuffer) return;
+    if (!editBuffer) {return;}
     setMaterials((prev) => prev.map((m) => (m.id === editBuffer.id ? editBuffer : m)));
     setEditingId(null);
     setEditBuffer(null);
@@ -253,8 +254,8 @@ export function MaterialsPage() {
                             setEditBuffer((prev) => prev ? { ...prev, [col.key]: e.currentTarget.value } : prev)
                           }
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') commitEdit();
-                            if (e.key === 'Escape') cancelEdit(material.id);
+                            if (e.key === 'Enter') {commitEdit();}
+                            if (e.key === 'Escape') {cancelEdit(material.id);}
                           }}
                           autoFocus={col.key === 'type'}
                         />

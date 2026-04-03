@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from 'react';
+import { InMemoryBackend, type BackendAdapter, type AppSnapshot } from './backend';
 
 // ── Material ────────────────────────────────────────────────────────────────
 
@@ -99,16 +100,16 @@ export type Experiment = {
 /** Fields required for an experiment to be 'ready' */
 export function getExperimentMissingFields(exp: Experiment): string[] {
   const missing: string[] = [];
-  if (!exp.name.trim()) missing.push('name');
-  if (!exp.date) missing.push('date');
-  if (!exp.numSubstrates || exp.numSubstrates < 1) missing.push('numSubstrates');
+  if (!exp.name.trim()) {missing.push('name');}
+  if (!exp.date) {missing.push('date');}
+  if (!exp.numSubstrates || exp.numSubstrates < 1) {missing.push('numSubstrates');}
   return missing;
 }
 
 /** Compute experiment status */
 export function getExperimentStatus(exp: Experiment): 'incomplete' | 'ready' | 'finished' {
-  if (exp.hasResults) return 'finished';
-  if (getExperimentMissingFields(exp).length === 0) return 'ready';
+  if (exp.hasResults) {return 'finished';}
+  if (getExperimentMissingFields(exp).length === 0) {return 'ready';}
   return 'incomplete';
 }
 
@@ -188,9 +189,9 @@ export function generateSubstrates(
   for (let i = 1; i <= count; i++) {
     const parts: string[] = [];
 
-    if (includeDate && date) parts.push(date);
-    if (includeExpName && experimentName) parts.push(experimentName.replace(/\s+/g, '_'));
-    if (includeUser && userName) parts.push(userName.replace(/\s+/g, '_'));
+    if (includeDate && date) {parts.push(date);}
+    if (includeExpName && experimentName) {parts.push(experimentName.replace(/\s+/g, '_'));}
+    if (includeUser && userName) {parts.push(userName.replace(/\s+/g, '_'));}
 
     // If no parts selected, use index-based names (A1, A2, etc.)
     if (parts.length === 0) {
@@ -521,7 +522,12 @@ type AppContextValue = {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-export function AppProvider({ children }: { children: ReactNode }) {
+const DEFAULT_BACKEND = new InMemoryBackend({ planes: [newPlane('Plane 1')] });
+
+/** Auto-save interval in milliseconds */
+const SAVE_INTERVAL_MS = 5_000;
+
+export function AppProvider({ children, backend = DEFAULT_BACKEND }: { children: ReactNode; backend?: BackendAdapter }) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [solutions, setSolutions] = useState<Solution[]>([]);
   const [experiments, setExperiments] = useState<Experiment[]>([]);
@@ -531,6 +537,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activePlaneId, setActivePlaneId] = useState<string | null>(null);
   const [pendingCollectionLink, setPendingCollectionLink] = useState<{ collectionId: string; planeId: string; kind: CollectionRef['kind'] } | null>(null);
   const [activeEntity, setActiveEntity] = useState<{ kind: 'experiment' | 'material' | 'solution'; id: string } | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  // Refs for save — avoids stale closure in the interval callback
+  const stateRef = useRef<AppSnapshot>({ materials, solutions, experiments, results, planes });
+  stateRef.current = { materials, solutions, experiments, results, planes };
+
+  // ── Load persisted state on mount ──────────────────────────────────────────
+
+  useEffect(() => {
+    let cancelled = false;
+    backend.load().then((snapshot) => {
+      if (cancelled) {return;}
+      if (snapshot.materials.length > 0) {setMaterials(snapshot.materials);}
+      if (snapshot.solutions.length > 0) {setSolutions(snapshot.solutions);}
+      if (snapshot.experiments.length > 0) {setExperiments(snapshot.experiments);}
+      if (snapshot.results.length > 0) {setResults(snapshot.results);}
+      if (snapshot.planes.length > 0) {setPlanes(snapshot.planes);}
+      setLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, [backend]);
+
+  // ── Auto-save at interval + on unload ──────────────────────────────────────
+
+  useEffect(() => {
+    if (!loaded) {return;}
+
+    const save = () => backend.save(stateRef.current);
+
+    const interval = setInterval(save, SAVE_INTERVAL_MS);
+    const handleUnload = () => { save(); };
+    window.addEventListener('beforeunload', handleUnload);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', handleUnload);
+      save(); // save on unmount
+    };
+  }, [backend, loaded]);
 
   // ── Plane mutations ────────────────────────────────────────────────────────
 
@@ -610,7 +655,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (planeId: string, srcId: string, dstId: string, merged: CanvasCollectionElement) => {
       setPlanes((prev) =>
         prev.map((p) => {
-          if (p.id !== planeId) return p;
+          if (p.id !== planeId) {return p;}
           const kept = p.elements.filter((e) => e.id !== srcId && e.id !== dstId);
           return { ...p, elements: [...kept, merged] };
         })
@@ -658,7 +703,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 export function useAppContext() {
   const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useAppContext must be used inside AppProvider');
+  if (!ctx) {throw new Error('useAppContext must be used inside AppProvider');}
   return ctx;
 }
 
@@ -677,9 +722,9 @@ export function useEntityCollection() {
   // Map from "kind:id" → the first CanvasCollectionElement that owns it in the active plane
   const entityToCollection = useMemo(() => {
     const map = new Map<string, CanvasCollectionElement>();
-    if (!activePlane) return map;
+    if (!activePlane) {return map;}
     for (const el of activePlane.elements) {
-      if (el.type !== 'collection') continue;
+      if (el.type !== 'collection') {continue;}
       const col = el as CanvasCollectionElement;
       for (const ref of col.refs) {
         if (!map.has(`${ref.kind}:${ref.id}`)) {
@@ -691,7 +736,7 @@ export function useEntityCollection() {
   }, [activePlane]);
 
   const activeCollection = useMemo(() => {
-    if (!activeCollectionId || !activePlane) return null;
+    if (!activeCollectionId || !activePlane) {return null;}
     const el = activePlane.elements.find((e) => e.id === activeCollectionId);
     return el?.type === 'collection' ? (el as CanvasCollectionElement) : null;
   }, [activeCollectionId, activePlane]);
@@ -706,7 +751,7 @@ export function useEntityCollection() {
   /** True when entity should be shown: all entities shown when no collection selected */
   const isEntityVisible = useCallback(
     (kind: CollectionRef['kind'], id: string): boolean => {
-      if (!activeCollection) return true;
+      if (!activeCollection) {return true;}
       return activeCollection.refs.some((r) => r.kind === kind && r.id === id);
     },
     [activeCollection]

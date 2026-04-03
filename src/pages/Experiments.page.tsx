@@ -92,7 +92,7 @@ function BufferedTextInput({
       onChange={(e) => setDraft(e.currentTarget.value)}
       onBlur={commit}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') commit();
+        if (e.key === 'Enter') {commit();}
         rest.onKeyDown?.(e);
       }}
     />
@@ -580,7 +580,7 @@ function ParameterVariationTab({
   };
 
   const applyHelperAssignment = () => {
-    if (selectedParamKeys.size === 0 || !helperValue) return;
+    if (selectedParamKeys.size === 0 || !helperValue) {return;}
     const newSubstrates = [...experiment.substrates];
     const keysToAssign = Array.from(selectedParamKeys);
 
@@ -1442,14 +1442,14 @@ export function ExperimentsPage() {
   const { getEntityColor, isEntityVisible } = useEntityCollection();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const selectExperiment = (id: string | null) => {
+  const selectExperiment = useCallback((id: string | null) => {
     setSelectedId(id);
     setActiveEntity(id ? { kind: 'experiment', id } : null);
-  };
+  }, [setActiveEntity]);
 
   // Auto-create experiment + link to collection when navigated from action bubble
   useEffect(() => {
-    if (!pendingCollectionLink || pendingCollectionLink.kind !== 'experiment') return;
+    if (!pendingCollectionLink || pendingCollectionLink.kind !== 'experiment') {return;}
     const { collectionId, planeId } = pendingCollectionLink;
     setPendingCollectionLink(null);
 
@@ -1466,7 +1466,7 @@ export function ExperimentsPage() {
         updateElement(planeId, updated);
       }
     }
-  }, [pendingCollectionLink, setPendingCollectionLink, setExperiments, planes, updateElement]);
+  }, [pendingCollectionLink, setPendingCollectionLink, setExperiments, planes, updateElement, selectExperiment]);
 
   const selectedExperiment = experiments.find((e) => e.id === selectedId);
 
@@ -1476,7 +1476,7 @@ export function ExperimentsPage() {
 
   const deleteExperiment = (id: string) => {
     setExperiments((prev) => prev.filter((e) => e.id !== id));
-    if (selectedId === id) selectExperiment(null);
+    if (selectedId === id) {selectExperiment(null);}
   };
 
   const createExperiment = () => {

@@ -31,7 +31,7 @@ import {
   IconTrash,
   IconX,
 } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   newComponent,
   newSolution,
@@ -40,7 +40,6 @@ import {
   useAppContext,
   useEntityCollection,
 } from '../store/AppContext';
-import { useEffect } from 'react';
 
 // ── Component row (material + amount + unit) ──────────────────────────────────
 
@@ -160,7 +159,7 @@ type SolutionCardProps = {
   onSelect?: (id: string) => void;
 };
 
-function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMaterialName, collectionColor, isSelected, onSelect }: SolutionCardProps) {
+function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMaterialName, collectionColor, isSelected: _isSelected, onSelect }: SolutionCardProps) {
   const [open, setOpen] = useState(false);
 
   const handleToggleOpen = (newOpen: boolean) => {
@@ -188,7 +187,7 @@ function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMateri
   };
 
   const commitComponent = () => {
-    if (!componentBuffer) return;
+    if (!componentBuffer) {return;}
     onUpdate({
       ...solution,
       components: solution.components.map((c) =>
@@ -239,7 +238,7 @@ function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMateri
                 value={nameBuffer}
                 onChange={(e) => setNameBuffer(e.currentTarget.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitName();
+                  if (e.key === 'Enter') {commitName();}
                   if (e.key === 'Escape') { setEditingName(false); setNameBuffer(solution.name); }
                 }}
                 autoFocus
@@ -366,8 +365,9 @@ export function SolutionsPage() {
 
   // Auto-create solution + link to collection when navigated from action bubble
   useEffect(() => {
-    console.log('[SolutionsPage] useEffect fired, pendingCollectionLink:', pendingCollectionLink);
-    if (!pendingCollectionLink || pendingCollectionLink.kind !== 'solution') return;
+    if (!pendingCollectionLink || pendingCollectionLink.kind !== 'solution') {
+      return;
+    }
     const { collectionId, planeId } = pendingCollectionLink;
     setPendingCollectionLink(null);
 

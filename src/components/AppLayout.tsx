@@ -1,4 +1,4 @@
-import { AppShell, Group, Title, Text, useMantineColorScheme, ActionIcon, Stack, Tooltip, rem, Box, Menu, UnstyledButton, ColorSwatch } from '@mantine/core';
+import { AppShell, Group, Text, useMantineColorScheme, ActionIcon, Stack, Tooltip, rem, Menu, UnstyledButton, ColorSwatch } from '@mantine/core';
 import { IconSun, IconMoon, IconChevronDown, IconX } from '@tabler/icons-react';
 import { useMemo } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -29,10 +29,10 @@ export function AppLayout() {
 
   // Find the active collection element (if any)
   const activeCollection = useMemo<CanvasCollectionElement | null>(() => {
-    if (!activeCollectionId) return null;
+    if (!activeCollectionId) {return null;}
     for (const plane of planes) {
       const el = plane.elements.find((e) => e.id === activeCollectionId);
-      if (el && el.type === 'collection') return el as CanvasCollectionElement;
+      if (el && el.type === 'collection') {return el as CanvasCollectionElement;}
     }
     return null;
   }, [activeCollectionId, planes]);
@@ -44,7 +44,7 @@ export function AppLayout() {
 
   // All collection elements in the active plane
   const collections = useMemo(() => {
-    if (!activePlane) return [];
+    if (!activePlane) {return [];}
     return activePlane.elements.filter((e) => e.type === 'collection') as CanvasCollectionElement[];
   }, [activePlane]);
 
@@ -53,7 +53,7 @@ export function AppLayout() {
 
   // Resolve the active entity's display name and icon
   const { entityName, EntityIcon } = useMemo(() => {
-    if (!activeEntity) return { entityName: null, EntityIcon: null };
+    if (!activeEntity) {return { entityName: null, EntityIcon: null };}
     let name: string | null = null;
     if (activeEntity.kind === 'experiment') {
       name = experiments.find((e) => e.id === activeEntity.id)?.name ?? null;
@@ -71,14 +71,14 @@ export function AppLayout() {
   // When on the Organization page and a collection is selected, compute which
   // page paths have refs in that collection — all others are dimmed.
   const litPaths = useMemo<Set<string> | null>(() => {
-    if (!location.pathname.startsWith('/organization') || !activeCollection) return null;
+    if (!location.pathname.startsWith('/organization') || !activeCollection) {return null;}
     const lit = new Set<string>(['/organization']);
     activeCollection.refs.forEach((r) => {
-      if (r.kind === 'material') lit.add('/materials');
-      if (r.kind === 'solution') lit.add('/solutions');
-      if (r.kind === 'experiment') lit.add('/experiments');
-      if (r.kind === 'result') lit.add('/results');
-      if (r.kind === 'analysis') lit.add('/analysis');
+      if (r.kind === 'material') {lit.add('/materials');}
+      if (r.kind === 'solution') {lit.add('/solutions');}
+      if (r.kind === 'experiment') {lit.add('/experiments');}
+      if (r.kind === 'result') {lit.add('/results');}
+      if (r.kind === 'analysis') {lit.add('/analysis');}
     });
     return lit;
   }, [activeCollection, location.pathname]);

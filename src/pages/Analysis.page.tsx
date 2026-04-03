@@ -3,7 +3,6 @@ import {
   Badge,
   Box,
   Button,
-  Checkbox,
   Divider,
   Group,
   MultiSelect,
@@ -14,7 +13,6 @@ import {
   Table,
   Text,
   Title,
-  Tooltip,
 } from '@mantine/core';
 import {
   IconChartBar,
@@ -22,13 +20,10 @@ import {
   IconChevronUp,
   IconFlask,
   IconGripVertical,
-  IconMaximize,
-  IconMinimize,
   IconPlus,
-  IconTrash,
   IconX,
 } from '@tabler/icons-react';
-import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type Experiment,
   type ExperimentLayer,
@@ -141,7 +136,7 @@ function generateBoxPlotData(paramName: string) {
 
 /** Generate example JV curve data */
 function generateJVCurveData() {
-  const generateJVCurve = (voc: number, jsc: number, ff: number, name: string, color: string) => {
+  const generateJVCurve = (voc: number, jsc: number, _ff: number, name: string, color: string) => {
     const voltages: number[] = [];
     const currents: number[] = [];
     
@@ -499,7 +494,7 @@ function DataTablePanel({
   const getVisibleParams = (layer: ExperimentLayer) => {
     return PARAM_KEYS.filter(key => {
       const param = layer[key];
-      if (!param) return false;
+      if (!param) {return false;}
       if (filterMode === 'varied') {
         const paramKey = `${layer.id}:${key}`;
         return variedParamKeys.has(paramKey);
@@ -725,7 +720,7 @@ export function AnalysisPage() {
   const handleDragStart = (widgetId: string, e: React.MouseEvent) => {
     e.preventDefault();
     const widget = widgets.find(w => w.id === widgetId);
-    if (!widget) return;
+    if (!widget) {return;}
     
     setDragState({
       widgetId,
@@ -742,7 +737,7 @@ export function AnalysisPage() {
     e.preventDefault();
     e.stopPropagation();
     const widget = widgets.find(w => w.id === widgetId);
-    if (!widget) return;
+    if (!widget) {return;}
     
     setResizeState({
       widgetId,
@@ -762,7 +757,7 @@ export function AnalysisPage() {
         const deltaY = e.clientY - dragState.startY;
         
         setWidgets(prev => prev.map(w => {
-          if (w.id !== dragState.widgetId) return w;
+          if (w.id !== dragState.widgetId) {return w;}
           return {
             ...w,
             x: snapToGrid(Math.max(0, dragState.startWidgetX + deltaX)),
@@ -776,7 +771,7 @@ export function AnalysisPage() {
         const deltaY = e.clientY - resizeState.startY;
         
         setWidgets(prev => prev.map(w => {
-          if (w.id !== resizeState.widgetId) return w;
+          if (w.id !== resizeState.widgetId) {return w;}
           return {
             ...w,
             width: snapToGrid(Math.max(MIN_WIDGET_SIZE, resizeState.startWidth + deltaX)),

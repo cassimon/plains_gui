@@ -15,7 +15,6 @@ import {
   Text,
   TextInput,
   Textarea,
-  Title,
   Tooltip,
   rem,
 } from '@mantine/core';
@@ -36,7 +35,6 @@ import {
   IconPlayerPlay,
   IconPlus,
   IconSeparatorVertical,
-  IconTrash,
   IconUnderline,
   IconX,
 } from '@tabler/icons-react';
@@ -199,14 +197,14 @@ function TextEl({
   const resizeStart = useRef<{ mouse: Vec2; size: Vec2 } | null>(null);
 
   const startDrag = (ev: ReactPointerEvent<HTMLDivElement>) => {
-    if (editing) return;
+    if (editing) {return;}
     setDragging(true);
     dragStart.current = { mouse: { x: ev.clientX, y: ev.clientY }, origin: { ...el.position } };
     (ev.target as HTMLElement).setPointerCapture(ev.pointerId);
   };
 
   const onPointerMove = (ev: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragging || !dragStart.current) return;
+    if (!dragging || !dragStart.current) {return;}
     const dx = ev.clientX - dragStart.current.mouse.x;
     const dy = ev.clientY - dragStart.current.mouse.y;
     onUpdate({
@@ -228,7 +226,7 @@ function TextEl({
   };
 
   const onResizeMove = (ev: ReactPointerEvent<HTMLDivElement>) => {
-    if (!resizeStart.current) return;
+    if (!resizeStart.current) {return;}
     ev.stopPropagation();
     const dx = ev.clientX - resizeStart.current.mouse.x;
     const dy = ev.clientY - resizeStart.current.mouse.y;
@@ -365,14 +363,14 @@ function PlainTextEl({
   const resizeStart = useRef<{ mouse: Vec2; size: Vec2 } | null>(null);
 
   const startDrag = (ev: ReactPointerEvent<HTMLDivElement>) => {
-    if (editing) return;
+    if (editing) {return;}
     setDragging(true);
     dragStart.current = { mouse: { x: ev.clientX, y: ev.clientY }, origin: { ...el.position } };
     (ev.target as HTMLElement).setPointerCapture(ev.pointerId);
   };
 
   const onPointerMove = (ev: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragging || !dragStart.current) return;
+    if (!dragging || !dragStart.current) {return;}
     const dx = ev.clientX - dragStart.current.mouse.x;
     const dy = ev.clientY - dragStart.current.mouse.y;
     onUpdate({
@@ -394,7 +392,7 @@ function PlainTextEl({
   };
 
   const onResizeMove = (ev: ReactPointerEvent<HTMLDivElement>) => {
-    if (!resizeStart.current) return;
+    if (!resizeStart.current) {return;}
     ev.stopPropagation();
     const dx = ev.clientX - resizeStart.current.mouse.x;
     const dy = ev.clientY - resizeStart.current.mouse.y;
@@ -563,7 +561,7 @@ function LineOverlay({
       }}
     >
       {lines.map((line) => {
-        if (line.points.length < 2) return null;
+        if (line.points.length < 2) {return null;}
         const d = line.points
           .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x + pan.x} ${p.y + pan.y}`)
           .join(' ');
@@ -636,20 +634,17 @@ function ActionBubble({
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          console.log('[ActionBubble] click fired for', label);
           onClick();
         }}
         onPointerDown={(e) => {
           e.stopPropagation();
           e.preventDefault();
           (e.target as HTMLElement).setPointerCapture(e.pointerId);
-          console.log('[ActionBubble] pointerDown for', label);
         }}
         onPointerUp={(e) => {
           e.stopPropagation();
           e.preventDefault();
           (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-          console.log('[ActionBubble] pointerUp for', label);
         }}
         style={{
           position: 'absolute',
@@ -687,7 +682,7 @@ function CollectionEl({
   onDropped: (srcId: string, finalPos: Vec2, originPos: Vec2, didMove: boolean) => void;
   onStartDivide: () => void;
 }) {
-  const { materials, solutions, activeCollectionId, setPendingCollectionLink } = useAppContext();
+  const { activeCollectionId, setPendingCollectionLink } = useAppContext();
   const navigate = useNavigate();
   const [dragging, setDragging] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -698,7 +693,6 @@ function CollectionEl({
   const isActive = activeCollectionId === el.id;
 
   if (process.env.NODE_ENV !== 'production') {
-    console.log('[CollectionEl] Rendering:', el.id, el.name, '| isActive:', isActive, '| refs:', el.refs.length, '| willShowDivideBtn:', isActive && el.refs.length > 0);
   }
 
   const startDrag = (ev: ReactPointerEvent<HTMLDivElement>) => {
@@ -709,10 +703,10 @@ function CollectionEl({
   };
 
   const onPointerMove = (ev: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragging || !dragStart.current) return;
+    if (!dragging || !dragStart.current) {return;}
     const dx = ev.clientX - dragStart.current.mouse.x;
     const dy = ev.clientY - dragStart.current.mouse.y;
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) didMove.current = true;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {didMove.current = true;}
     const newPos = {
       x: snapToGrid(dragStart.current.origin.x + dx),
       y: snapToGrid(dragStart.current.origin.y + dy),
@@ -727,11 +721,6 @@ function CollectionEl({
     onDropped(el.id, finalPosRef.current, origin, didMove.current);
     setDragging(false);
     dragStart.current = null;
-  };
-
-  const addRef = (ref: CollectionRef) => {
-    if (el.refs.some((r) => r.kind === ref.kind && r.id === ref.id)) return;
-    onUpdate({ ...el, refs: [...el.refs, ref] });
   };
 
   const commitName = () => {
@@ -757,11 +746,8 @@ function CollectionEl({
   };
 
   const handleBubbleClick = (kind: CollectionRef['kind']) => {
-    console.log('[handleBubbleClick] kind:', kind, 'collectionId:', el.id, 'planeId:', planeId, 'route:', routeForKind[kind]);
     setPendingCollectionLink({ collectionId: el.id, planeId, kind });
-    console.log('[handleBubbleClick] calling navigate to', routeForKind[kind]);
     navigate(routeForKind[kind]);
-    console.log('[handleBubbleClick] navigate called');
   };
 
   const actions: { label: string; Icon: React.ElementType; color: string; kind: CollectionRef['kind'] }[] = [
@@ -833,7 +819,7 @@ function CollectionEl({
             autoFocus
             onChange={(e) => setNameBuffer(e.currentTarget.value)}
             onBlur={commitName}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitName(); if (e.key === 'Escape') setEditingName(false); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') {commitName();} if (e.key === 'Escape') {setEditingName(false);} }}
             onPointerDown={(e) => e.stopPropagation()}
           />
         ) : (
@@ -884,7 +870,6 @@ function CollectionEl({
             color="violet"
             radius="xl"
             onPointerDown={(e) => {
-              console.log('[CollectionEl.divide] Firing onStartDivide immediately on pointerDown');
               e.stopPropagation();
               e.preventDefault();
               onStartDivide();
@@ -994,14 +979,14 @@ function DetailedDivisionModal({
   };
 
   const onContainerPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragRefId) return;
+    if (!dragRefId) {return;}
     const rect = e.currentTarget.getBoundingClientRect();
     const relX = e.clientX - rect.left;
     setHoverSide(relX < rect.width / 2 ? 'left' : 'right');
   };
 
   const onContainerPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragRefId) return;
+    if (!dragRefId) {return;}
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const relX = e.clientX - rect.left;
@@ -1128,7 +1113,6 @@ function DivisionOverlay({
   }, {});
   const kinds = Object.keys(refsByKind) as CollectionRef['kind'][];
 
-  console.log('[DivisionOverlay] Rendering for collection:', collection.id, collection.name, 'with', kinds.length, 'kinds');
 
   // Track which side each kind is assigned to (initially all on left)
   // 'center' means the kind has been split via detailed division
@@ -1150,14 +1134,13 @@ function DivisionOverlay({
   const dragStartX = useRef(0);
 
   const startDrag = (kind: CollectionRef['kind']) => (e: ReactPointerEvent) => {
-    console.log('[DivisionOverlay] Start drag:', kind);
     e.stopPropagation();
     dragStartX.current = e.clientX;
     setDragKind(kind);
   };
 
   const onContainerPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragKind) return;
+    if (!dragKind) {return;}
     const rect = e.currentTarget.getBoundingClientRect();
     const relX = e.clientX - rect.left;
     const containerWidth = rect.width;
@@ -1173,7 +1156,7 @@ function DivisionOverlay({
   };
 
   const onContainerPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragKind) return;
+    if (!dragKind) {return;}
     e.stopPropagation();
     
     const rect = e.currentTarget.getBoundingClientRect();
@@ -1228,7 +1211,6 @@ function DivisionOverlay({
   };
 
   const handleConfirm = () => {
-    console.log('[DivisionOverlay.handleConfirm] Confirming with leftName:', leftName, 'rightName:', rightName);
     
     const leftRefs: CollectionRef[] = [];
     const rightRefs: CollectionRef[] = [];
@@ -1251,7 +1233,6 @@ function DivisionOverlay({
       }
     }
     
-    console.log('[DivisionOverlay.handleConfirm] Calling onConfirm with leftRefs:', leftRefs.length, 'rightRefs:', rightRefs.length);
     onConfirm(leftRefs, rightRefs, leftName.trim() || collection.name, rightName.trim() || collection.name);
   };
 
@@ -1260,8 +1241,8 @@ function DivisionOverlay({
     const refs = refsByKind[kind] || [];
     let left = 0, right = 0;
     for (const ref of refs) {
-      if (detailedAssignments[ref.id] === 'left') left++;
-      else right++;
+      if (detailedAssignments[ref.id] === 'left') {left++;}
+      else {right++;}
     }
     return { left, right };
   };
@@ -1299,7 +1280,7 @@ function DivisionOverlay({
     <Modal
       opened
       onClose={onCancel}
-      title={`Divide \"${collection.name}\"`}
+      title={`Divide "${collection.name}"`}
       size="lg"
       centered
     >
@@ -1513,6 +1494,7 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
   // Plain text formatting options (default: black text, no formatting)
   const [textColor, setTextColor] = useState<string>('#000000');
   const [textFormatting, setTextFormatting] = useState<TextFormatting>({ bold: false, italic: false, underline: false });
+  const [editingPlaintextId, setEditingPlaintextId] = useState<string | null>(null);
   const drawingLineId = useRef<string | null>(null);
   const plaintextEditingRef = useRef(false);
 
@@ -1556,7 +1538,7 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
   };
 
   const handleFuse = () => {
-    if (!fuseDialog) return;
+    if (!fuseDialog) {return;}
     const { src, dst } = fuseDialog;
     const mergedRefs = [...src.refs];
     for (const r of dst.refs) {
@@ -1587,11 +1569,8 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
   const [dividingCollection, setDividingCollection] = useState<CanvasCollectionElement | null>(null);
 
   const handleStartDivide = (collection: CanvasCollectionElement) => {
-    console.log('[PlaneCanvas.handleStartDivide] Handler called for collection:', collection.id, collection.name);
     setDividingCollection(collection);
-    console.log('[PlaneCanvas.handleStartDivide] State update scheduled, dividingCollection set to:', collection.id);
     setActiveCollectionId(null); // Deselect to hide action bubbles
-    console.log('[PlaneCanvas.handleStartDivide] Complete');
   };
 
   const handleCancelDivide = () => {
@@ -1604,16 +1583,10 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
     leftName: string,
     rightName: string
   ) => {
-    console.log('[PlaneCanvas.handleConfirmDivide] Confirming division');
-    console.log('[PlaneCanvas.handleConfirmDivide] dividingCollection:', dividingCollection);
     if (!dividingCollection) {
-      console.error('[PlaneCanvas.handleConfirmDivide] ERROR: dividingCollection is null!');
       return;
     }
     const original = dividingCollection;
-    console.log('[PlaneCanvas.handleConfirmDivide] Original collection:', original.id, original.name);
-    console.log('[PlaneCanvas.handleConfirmDivide] LeftRefs:', leftRefs.length, 'RightRefs:', rightRefs.length);
-    console.log('[PlaneCanvas.handleConfirmDivide] Left Name:', leftName, 'Right Name:', rightName);
     // Create left collection
     const leftCol: CanvasCollectionElement = {
       id: crypto.randomUUID(),
@@ -1624,7 +1597,6 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
       color: original.color,
       refs: leftRefs,
     };
-    console.log('[PlaneCanvas.handleConfirmDivide] Created leftCol:', leftCol.id, leftCol.name);
     // Create right collection
     const rightCol: CanvasCollectionElement = {
       id: crypto.randomUUID(),
@@ -1635,19 +1607,13 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
       color: original.color,
       refs: rightRefs,
     };
-    console.log('[PlaneCanvas.handleConfirmDivide] Created rightCol:', rightCol.id, rightCol.name);
     // Delete original, add two new
-    console.log('[PlaneCanvas.handleConfirmDivide] Deleting original:', original.id);
     deleteElement(plane.id, original.id);
     // Use updatePlane to batch add both
     const newElements = plane.elements.filter((e) => e.id !== original.id);
-    console.log('[PlaneCanvas.handleConfirmDivide] newElements count before push:', newElements.length);
     newElements.push(leftCol, rightCol);
-    console.log('[PlaneCanvas.handleConfirmDivide] newElements count after push:', newElements.length);
     updatePlane({ ...plane, elements: newElements });
-    console.log('[PlaneCanvas.handleConfirmDivide] updatePlane called');
     setDividingCollection(null);
-    console.log('[PlaneCanvas.handleConfirmDivide] Division complete');
   };
 
   // Find active collection's color
@@ -1660,7 +1626,7 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'Space') spaceDown.current = e.type === 'keydown';
+      if (e.code === 'Space') {spaceDown.current = e.type === 'keydown';}
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onKey);
@@ -1670,7 +1636,7 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
   // ── Measure container height for scrollbar ─────────────────────────────────
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) {return;}
     const ro = new ResizeObserver(() => setContainerHeight(el.clientHeight));
     ro.observe(el);
     setContainerHeight(el.clientHeight);
@@ -1680,7 +1646,7 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
   // ── Mouse-wheel vertical scrolling (clamped) ────────────────────────────────
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) {return;}
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       setPan((prev) => ({
@@ -1702,7 +1668,7 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
     thumbDragStart.current = { mouseY: e.clientY, panY: pan.y };
   };
   const onThumbPointerMove = (e: ReactPointerEvent) => {
-    if (!thumbDragStart.current) return;
+    if (!thumbDragStart.current) {return;}
     e.stopPropagation();
     const dy = e.clientY - thumbDragStart.current.mouseY;
     const newY = thumbTrack > 0
@@ -1723,14 +1689,14 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
       e.preventDefault();
       return;
     }
-    if (e.button !== 0) return;
+    if (e.button !== 0) {return;}
 
     // clicking bare canvas background deselects active collection
-    if (tool === 'select') setActiveCollectionId(null);
+    if (tool === 'select') {setActiveCollectionId(null);}
 
     // For placement tools, only act on the bare canvas background - bail if clicking on an existing element
     const isPlacementTool = tool === 'text' || tool === 'plaintext' || tool === 'collection';
-    if (isPlacementTool && e.target !== e.currentTarget) return;
+    if (isPlacementTool && e.target !== e.currentTarget) {return;}
 
     const pos = canvasCoords(e, containerRef, pan);
 
@@ -1740,10 +1706,11 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
       setTool('select');
     } else if (tool === 'plaintext') {
       // Don't place if currently editing another plaintext element
-      if (plaintextEditingRef.current) return;
+      if (plaintextEditingRef.current) {return;}
       e.preventDefault(); // prevent canvas from stealing focus from the auto-focused Textarea
       plaintextEditingRef.current = true; // mark as editing (new element auto-focuses)
-      addPlainTextElement(plane.id, pos, textColor, textFormatting);
+      const newEl = addPlainTextElement(plane.id, pos, textColor, textFormatting);
+      setEditingPlaintextId(newEl.id);
       // keep tool selected so formatting options stay visible
     } else if (tool === 'collection') {
       const el = addCollectionElement(plane.id, pos);
@@ -1777,7 +1744,7 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
     }
   };
 
-  const onMouseUp = (e: MouseEvent<HTMLDivElement>) => {
+  const onMouseUp = (_e: MouseEvent<HTMLDivElement>) => {
     if (isPanning.current) {
       isPanning.current = false;
       panStart.current = null;
@@ -1835,7 +1802,15 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
               <ActionIcon
                 variant={textFormatting.bold ? 'filled' : 'subtle'}
                 color={textFormatting.bold ? 'blue' : 'gray'}
-                onClick={() => setTextFormatting((f) => ({ ...f, bold: !f.bold }))}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  const newFormatting = { ...textFormatting, bold: !textFormatting.bold };
+                  setTextFormatting(newFormatting);
+                  if (editingPlaintextId) {
+                    const el = plane.elements.find((e) => e.id === editingPlaintextId) as CanvasPlainTextElement | undefined;
+                    if (el) {updateElement(plane.id, { ...el, formatting: newFormatting });}
+                  }
+                }}
               >
                 <IconBold size={16} />
               </ActionIcon>
@@ -1844,7 +1819,15 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
               <ActionIcon
                 variant={textFormatting.italic ? 'filled' : 'subtle'}
                 color={textFormatting.italic ? 'blue' : 'gray'}
-                onClick={() => setTextFormatting((f) => ({ ...f, italic: !f.italic }))}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  const newFormatting = { ...textFormatting, italic: !textFormatting.italic };
+                  setTextFormatting(newFormatting);
+                  if (editingPlaintextId) {
+                    const el = plane.elements.find((e) => e.id === editingPlaintextId) as CanvasPlainTextElement | undefined;
+                    if (el) {updateElement(plane.id, { ...el, formatting: newFormatting });}
+                  }
+                }}
               >
                 <IconItalic size={16} />
               </ActionIcon>
@@ -1853,7 +1836,15 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
               <ActionIcon
                 variant={textFormatting.underline ? 'filled' : 'subtle'}
                 color={textFormatting.underline ? 'blue' : 'gray'}
-                onClick={() => setTextFormatting((f) => ({ ...f, underline: !f.underline }))}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  const newFormatting = { ...textFormatting, underline: !textFormatting.underline };
+                  setTextFormatting(newFormatting);
+                  if (editingPlaintextId) {
+                    const el = plane.elements.find((e) => e.id === editingPlaintextId) as CanvasPlainTextElement | undefined;
+                    if (el) {updateElement(plane.id, { ...el, formatting: newFormatting });}
+                  }
+                }}
               >
                 <IconUnderline size={16} />
               </ActionIcon>
@@ -1995,12 +1986,14 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
                   onDelete={() => deleteElement(plane.id, el.id)}
                   onStartEdit={() => {
                     plaintextEditingRef.current = true;
+                    setEditingPlaintextId(ptel.id);
                     setTool('plaintext');
                     setTextColor(ptel.color);
                     setTextFormatting(ptel.formatting);
                   }}
                   onEditEnd={() => {
                     plaintextEditingRef.current = false;
+                    setEditingPlaintextId(null);
                     setTool('select');
                   }}
                   pan={pan}
@@ -2028,7 +2021,6 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
                   onDragPositionUpdate={(pos) => handleDragPositionUpdate(el.id, pos)}
                   onDropped={handleDrop}
                   onStartDivide={() => {
-                    console.log('[PlaneCanvas render] Calling handleStartDivide for collection:', el.id);
                     handleStartDivide(el as CanvasCollectionElement);
                   }}
                 />
@@ -2040,6 +2032,20 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
 
         {/* Custom scrollbar track */}
         <div
+          role="scrollbar"
+          aria-controls="canvas-area"
+          aria-valuenow={0}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-orientation="vertical"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowUp') {
+              setPan((prev) => ({ ...prev, y: Math.min(0, prev.y + 40) }));
+            } else if (e.key === 'ArrowDown') {
+              setPan((prev) => ({ ...prev, y: Math.max(-maxPanYRef.current, prev.y - 40) }));
+            }
+          }}
           style={{
             width: 10,
             flexShrink: 0,
@@ -2094,7 +2100,7 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
               label="New collection name"
               value={fuseName}
               onChange={(e) => setFuseName(e.currentTarget.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && fuseName.trim()) handleFuse(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && fuseName.trim()) {handleFuse();} }}
             />
             <div>
               <Text size="sm" fw={500} mb={6}>Color</Text>
@@ -2172,7 +2178,7 @@ function PlaneTabLabel({
         autoFocus
         onChange={(e) => setBuf(e.currentTarget.value)}
         onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setBuf(plane.name); setEditing(false); } }}
+        onKeyDown={(e) => { if (e.key === 'Enter') {commit();} if (e.key === 'Escape') { setBuf(plane.name); setEditing(false); } }}
         style={{ width: rem(100) }}
         onClick={(e) => e.stopPropagation()}
       />
@@ -2219,7 +2225,7 @@ export function OrganizationPage() {
   };
 
   const handleDeletePlane = (id: string) => {
-    if (planes.length <= 1) return;
+    if (planes.length <= 1) {return;}
     modals.openConfirmModal({
       title: 'Delete plane',
       children: <Text size="sm">Delete this plane and all its content?</Text>,
@@ -2247,7 +2253,7 @@ export function OrganizationPage() {
     >
       <Tabs
         value={activePlaneId ?? ''}
-        onChange={(v) => { if (v) setActivePlaneId(v); }}
+        onChange={(v) => { if (v) {setActivePlaneId(v);} }}
         style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}
         keepMounted={false}
       >

@@ -48,10 +48,10 @@ import {
 /** Get file category based on extension */
 function getFileCategory(fileName: string): MeasurementType | null {
   const lower = fileName.toLowerCase();
-  if (lower.endsWith('.txt')) return 'Unknown'; // Will be determined by content
-  if (lower.match(/\.(png|jpg|jpeg|tiff|tif|gif|webp)$/)) return 'Image';
-  if (lower.match(/\.(pdf|docx?|odt|rtf)$/)) return 'Document';
-  if (lower.match(/\.(zip|7z|rar|tar|gz)$/)) return 'Archive';
+  if (lower.endsWith('.txt')) {return 'Unknown';} // Will be determined by content
+  if (lower.match(/\.(png|jpg|jpeg|tiff|tif|gif|webp)$/)) {return 'Image';}
+  if (lower.match(/\.(pdf|docx?|odt|rtf)$/)) {return 'Document';}
+  if (lower.match(/\.(zip|7z|rar|tar|gz)$/)) {return 'Archive';}
   return null;
 }
 
@@ -63,18 +63,18 @@ function extractDeviceFromFilename(fileName: string): string {
   // Try to extract device patterns like "AI44", "Device_01", etc.
   // Pattern 1: Letters followed by numbers (e.g., "AI44", "XY123")
   const match1 = baseName.match(/^([A-Za-z]+\d+)/);
-  if (match1) return match1[1].toUpperCase();
+  if (match1) {return match1[1].toUpperCase();}
   
   // Pattern 2: Anything before the first underscore or dash
   const match2 = baseName.match(/^([^_\-\s]+)/);
-  if (match2) return match2[1];
+  if (match2) {return match2[1];}
   
   return baseName;
 }
 
 /** Parse device name supporting formats like "AI44-1C" or "3C_C1_2" */
 function parseDeviceName(deviceString: string): { device: string; cell: string; pixel: string } {
-  if (!deviceString) return { device: '', cell: '', pixel: '' };
+  if (!deviceString) {return { device: '', cell: '', pixel: '' };}
   
   const trimmed = deviceString.trim();
   
@@ -182,8 +182,8 @@ function stringSimilarity(str1: string, str2: string): number {
   const s1 = str1.toLowerCase();
   const s2 = str2.toLowerCase();
   
-  if (s1 === s2) return 1;
-  if (s1.length === 0 || s2.length === 0) return 0;
+  if (s1 === s2) {return 1;}
+  if (s1.length === 0 || s2.length === 0) {return 0;}
   
   // Simple Levenshtein-based similarity
   const longer = s1.length > s2.length ? s1 : s2;
@@ -305,7 +305,6 @@ function DeviceGroupCard({
   expanded: boolean;
   onToggleExpand: () => void;
 }) {
-  const assignedSubstrate = substrates.find(s => s.id === group.assignedSubstrateId);
   
   return (
     <Paper withBorder p="sm" radius="md">
@@ -451,13 +450,13 @@ function ResultsDetail({
       // Fuzzy matching - group similar names together
       const assigned = new Set<string>();
       for (const file of files) {
-        if (assigned.has(file.id)) continue;
+        if (assigned.has(file.id)) {continue;}
         
         const groupFiles = [file];
         assigned.add(file.id);
         
         for (const other of files) {
-          if (assigned.has(other.id)) continue;
+          if (assigned.has(other.id)) {continue;}
           const similarity = stringSimilarity(file.deviceName, other.deviceName);
           if (similarity > 0.8) {
             groupFiles.push(other);
@@ -540,9 +539,9 @@ function ResultsDetail({
         
         // Parse device name for cell/pixel
         const { device, cell, pixel } = parseDeviceName(measurementFile.deviceName || '');
-        if (device) measurementFile.deviceName = device;
-        if (cell) measurementFile.cell = cell;
-        if (pixel) measurementFile.pixel = pixel;
+        if (device) {measurementFile.deviceName = device;}
+        if (cell) {measurementFile.cell = cell;}
+        if (pixel) {measurementFile.pixel = pixel;}
       } else {
         measurementFile.fileType = category;
         measurementFile.deviceName = extractDeviceFromFilename(file.name);
@@ -551,7 +550,7 @@ function ResultsDetail({
       newFiles.push(measurementFile);
     }
     
-    if (newFiles.length === 0) return;
+    if (newFiles.length === 0) {return;}
     
     // Group files by device name
     const allFiles = [...results.files, ...newFiles];
@@ -822,7 +821,7 @@ export function ResultsPage() {
   
   // Filter experiments that are at least "ready" status
   const visibleExperiments = experiments.filter(e => {
-    if (!isEntityVisible('experiment', e.id)) return false;
+    if (!isEntityVisible('experiment', e.id)) {return false;}
     const status = getExperimentStatus(e);
     // Show experiments that are ready or finished
     return status === 'ready' || status === 'finished';
