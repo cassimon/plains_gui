@@ -1,9 +1,12 @@
-import { AppShell, Group, Title, useMantineColorScheme, ActionIcon, Stack, Tooltip, rem } from '@mantine/core';
-import { IconSun, IconMoon } from '@tabler/icons-react';
+import { AppShell, Group, Title, Text, useMantineColorScheme, ActionIcon, Stack, Tooltip, rem, Box, Menu, UnstyledButton, ColorSwatch } from '@mantine/core';
+import { IconSun, IconMoon, IconChevronDown, IconX } from '@tabler/icons-react';
 import { useMemo } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { type CanvasCollectionElement, useAppContext } from '../store/AppContext';
 import { pageIcons } from './AppLayout.icons';
+
+// Neutral grayish-blue for default selections
+const DEFAULT_ACCENT = '#94a3b8';
 
 const pages = [
   { label: 'Organization', value: '/organization' },
@@ -19,31 +22,49 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
-  const { planes, activeCollectionId } = useAppContext();
+  const { planes, activeCollectionId, setActiveCollectionId, activePlaneId, setActivePlaneId } = useAppContext();
 
   const currentPage = pages.find((p) => location.pathname.startsWith(p.value))?.value ?? pages[0].value;
+
+
+  // Find the active collection element (if any)
+  const activeCollection = useMemo<CanvasCollectionElement | null>(() => {
+    if (!activeCollectionId) return null;
+    for (const plane of planes) {
+      const el = plane.elements.find((e) => e.id === activeCollectionId);
+      if (el && el.type === 'collection') return el as CanvasCollectionElement;
+    }
+    return null;
+  }, [activeCollectionId, planes]);
+
+  // Find the active plane from context (set by OrganizationPage tab selection)
+  const activePlane = useMemo(() => {
+    return planes.find((p) => p.id === activePlaneId) || planes[0];
+  }, [activePlaneId, planes]);
+
+  // All collection elements in the active plane
+  const collections = useMemo(() => {
+    if (!activePlane) return [];
+    return activePlane.elements.filter((e) => e.type === 'collection') as CanvasCollectionElement[];
+  }, [activePlane]);
+
+  // Accent color: collection color if selected, otherwise neutral
+  const accentColor = activeCollection?.color || DEFAULT_ACCENT;
 
   // When on the Organization page and a collection is selected, compute which
   // page paths have refs in that collection — all others are dimmed.
   const litPaths = useMemo<Set<string> | null>(() => {
-    if (!location.pathname.startsWith('/organization') || !activeCollectionId) return null;
-    for (const plane of planes) {
-      const el = plane.elements.find((e) => e.id === activeCollectionId);
-      if (el && el.type === 'collection') {
-        const col = el as CanvasCollectionElement;
-        const lit = new Set<string>(['/organization']);
-        col.refs.forEach((r) => {
-          if (r.kind === 'material') lit.add('/materials');
-          if (r.kind === 'solution') lit.add('/solutions');
-          if (r.kind === 'experiment') lit.add('/experiments');
-          if (r.kind === 'result') lit.add('/results');
-          if (r.kind === 'analysis') lit.add('/analysis');
-        });
-        return lit;
-      }
-    }
-    return null;
-  }, [activeCollectionId, planes, location.pathname]);
+    if (!location.pathname.startsWith('/organization') || !activeCollection) return null;
+    const lit = new Set<string>(['/organization']);
+    activeCollection.refs.forEach((r) => {
+      if (r.kind === 'material') lit.add('/materials');
+      if (r.kind === 'solution') lit.add('/solutions');
+      if (r.kind === 'experiment') lit.add('/experiments');
+      if (r.kind === 'result') lit.add('/results');
+      if (r.kind === 'analysis') lit.add('/analysis');
+    });
+    return lit;
+  }, [activeCollection, location.pathname]);
 
   return (
     <AppShell
@@ -53,7 +74,73 @@ export function AppLayout() {
     >
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between">
-          <Title order={3}>Plains</Title>
+          <Group gap={4} align="center">
+            {/* Plane selector */}
+            <Menu shadow="md" width={220}>
+              <Menu.Target>
+                <UnstyledButton style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Text fw={600} size="lg">{activePlane?.name ?? '—'}</Text>
+                  <IconChevronDown size={14} style={{ color: 'var(--mantine-color-dimmed)' }} />
+                </UnstyledButton>
+              </Menu.Target>
+              <Menu.Dropdown>
+                {planes.map((p) => (
+                  <Menu.Item
+                    key={p.id}
+                    fw={p.id === activePlaneId ? 700 : undefined}
+                    onClick={() => setActivePlaneId(p.id)}
+                  >
+                    {p.name}
+                  </Menu.Item>
+                ))}
+              </Menu.Dropdown>
+            </Menu>
+
+            <Text c="dimmed">:</Text>
+
+            {/* Collection selector */}
+            <Menu shadow="md" width={240}>
+              <Menu.Target>
+                <UnstyledButton
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    borderLeft: activeCollection ? `3px solid ${accentColor}` : undefined,
+                    paddingLeft: activeCollection ? 8 : 0,
+                  }}
+                >
+                  <Text fw={600} size="lg" c={activeCollection ? undefined : 'dimmed'}>
+                    {activeCollection?.name ?? 'No Collection'}
+                  </Text>
+                  <IconChevronDown size={14} style={{ color: 'var(--mantine-color-dimmed)' }} />
+                </UnstyledButton>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item
+                  leftSection={<IconX size={14} />}
+                  disabled={!activeCollection}
+                  onClick={() => setActiveCollectionId(null)}
+                >
+                  No Collection
+                </Menu.Item>
+                {collections.length > 0 && <Menu.Divider />}
+                {collections.map((col) => (
+                  <Menu.Item
+                    key={col.id}
+                    fw={col.id === activeCollectionId ? 700 : undefined}
+                    leftSection={<ColorSwatch color={col.color || DEFAULT_ACCENT} size={12} />}
+                    onClick={() => setActiveCollectionId(col.id)}
+                  >
+                    {col.name}
+                  </Menu.Item>
+                ))}
+                {collections.length === 0 && (
+                  <Menu.Item disabled>No collections in this plane</Menu.Item>
+                )}
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
           <ActionIcon
             variant="default"
             size="lg"
@@ -71,11 +158,12 @@ export function AppLayout() {
             const Icon = pageIcons[page.value as keyof typeof pageIcons];
             const active = currentPage === page.value;
             const dimmed = litPaths !== null && !litPaths.has(page.value);
+            // "hasContent" = collection has at least one ref of this type
+            const hasContent = litPaths !== null && litPaths.has(page.value) && page.value !== '/organization';
             return (
               <Tooltip label={page.label} position="left" key={page.value}>
                 <ActionIcon
                   variant={active ? 'filled' : 'subtle'}
-                  color={active ? 'blue' : 'gray'}
                   size="lg"
                   radius="md"
                   onClick={() => navigate(page.value)}
@@ -84,7 +172,13 @@ export function AppLayout() {
                     width: rem(48),
                     height: rem(48),
                     opacity: dimmed ? 0.25 : 1,
-                    transition: 'opacity 150ms ease',
+                    transition: 'opacity 150ms ease, background 150ms ease',
+                    background: active ? accentColor : undefined,
+                    color: active
+                      ? 'white'
+                      : hasContent
+                        ? 'var(--mantine-color-gray-7)'
+                        : 'var(--mantine-color-gray-6)',
                   }}
                 >
                   {Icon ? <Icon size={28} /> : null}

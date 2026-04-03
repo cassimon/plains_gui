@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
 
 // ── Material ────────────────────────────────────────────────────────────────
 
@@ -25,6 +25,24 @@ export function newMaterial(): Material {
     pubchemCid: '',
     inventoryLabel: '',
     purity: '',
+  };
+}
+
+// ── Experiment ───────────────────────────────────────────────────────────────
+
+export type Experiment = {
+  id: string;
+  name: string;
+  description: string;
+  date: string; // ISO date string
+};
+
+export function newExperiment(): Experiment {
+  return {
+    id: crypto.randomUUID(),
+    name: 'New Experiment',
+    description: '',
+    date: new Date().toISOString().slice(0, 10),
   };
 }
 
@@ -140,6 +158,8 @@ type AppContextValue = {
   setMaterials: React.Dispatch<React.SetStateAction<Material[]>>;
   solutions: Solution[];
   setSolutions: React.Dispatch<React.SetStateAction<Solution[]>>;
+  experiments: Experiment[];
+  setExperiments: React.Dispatch<React.SetStateAction<Experiment[]>>;
   planes: Plane[];
 
   // ── Plane repository ──────────────────────────────────────────────────────
@@ -153,11 +173,25 @@ type AppContextValue = {
   addCollectionElement: (planeId: string, position: Vec2) => CanvasCollectionElement;
   updateElement: (planeId: string, element: CanvasElement) => void;
   deleteElement: (planeId: string, elementId: string) => void;
+  /** Remove srcId and dstId, insert merged collection — all in one atomic update */
+  fuseCollections: (planeId: string, srcId: string, dstId: string, merged: CanvasCollectionElement) => void;
 
   // ── Selection ─────────────────────────────────────────────────────────────
   /** ID of the currently focused Collection canvas element, or null */
   activeCollectionId: string | null;
   setActiveCollectionId: (id: string | null) => void;
+
+  /** ID of the plane currently shown in the Organisation tab */
+  activePlaneId: string | null;
+  setActivePlaneId: (id: string | null) => void;
+
+  /**
+   * When an action bubble creates a new item and navigates to another page,
+   * this holds { collectionId, kind } so that page knows to auto-create an
+   * item and link it back to the collection.
+   */
+  pendingCollectionLink: { collectionId: string; planeId: string; kind: CollectionRef['kind'] } | null;
+  setPendingCollectionLink: (v: { collectionId: string; planeId: string; kind: CollectionRef['kind'] } | null) => void;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -165,8 +199,11 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [solutions, setSolutions] = useState<Solution[]>([]);
+  const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [planes, setPlanes] = useState<Plane[]>([newPlane('Plane 1')]);
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+  const [activePlaneId, setActivePlaneId] = useState<string | null>(null);
+  const [pendingCollectionLink, setPendingCollectionLink] = useState<{ collectionId: string; planeId: string; kind: CollectionRef['kind'] } | null>(null);
 
   // ── Plane mutations ────────────────────────────────────────────────────────
 
@@ -231,6 +268,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const fuseCollections = useCallback(
+    (planeId: string, srcId: string, dstId: string, merged: CanvasCollectionElement) => {
+      setPlanes((prev) =>
+        prev.map((p) => {
+          if (p.id !== planeId) return p;
+          const kept = p.elements.filter((e) => e.id !== srcId && e.id !== dstId);
+          return { ...p, elements: [...kept, merged] };
+        })
+      );
+    },
+    []
+  );
+
   return (
     <AppContext.Provider
       value={{
@@ -238,6 +288,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setMaterials,
         solutions,
         setSolutions,
+        experiments,
+        setExperiments,
         planes,
         addPlane,
         updatePlane,
@@ -247,8 +299,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addCollectionElement,
         updateElement,
         deleteElement,
+        fuseCollections,
         activeCollectionId,
         setActiveCollectionId,
+        activePlaneId,
+        setActivePlaneId,
+        pendingCollectionLink,
+        setPendingCollectionLink,
       }}
     >
       {children}
@@ -260,4 +317,57 @@ export function useAppContext() {
   const ctx = useContext(AppContext);
   if (!ctx) throw new Error('useAppContext must be used inside AppProvider');
   return ctx;
+}
+
+/**
+ * Returns helpers for filtering entity lists and resolving collection colors
+ * based on the currently active plane and collection selection.
+ */
+export function useEntityCollection() {
+  const { planes, activePlaneId, activeCollectionId } = useAppContext();
+
+  const activePlane = useMemo(
+    () => planes.find((p) => p.id === activePlaneId) ?? planes[0] ?? null,
+    [planes, activePlaneId]
+  );
+
+  // Map from "kind:id" → the first CanvasCollectionElement that owns it in the active plane
+  const entityToCollection = useMemo(() => {
+    const map = new Map<string, CanvasCollectionElement>();
+    if (!activePlane) return map;
+    for (const el of activePlane.elements) {
+      if (el.type !== 'collection') continue;
+      const col = el as CanvasCollectionElement;
+      for (const ref of col.refs) {
+        if (!map.has(`${ref.kind}:${ref.id}`)) {
+          map.set(`${ref.kind}:${ref.id}`, col);
+        }
+      }
+    }
+    return map;
+  }, [activePlane]);
+
+  const activeCollection = useMemo(() => {
+    if (!activeCollectionId || !activePlane) return null;
+    const el = activePlane.elements.find((e) => e.id === activeCollectionId);
+    return el?.type === 'collection' ? (el as CanvasCollectionElement) : null;
+  }, [activeCollectionId, activePlane]);
+
+  /** Color of the collection that owns this entity in the active plane, or null */
+  const getEntityColor = useCallback(
+    (kind: CollectionRef['kind'], id: string): string | null =>
+      entityToCollection.get(`${kind}:${id}`)?.color ?? null,
+    [entityToCollection]
+  );
+
+  /** True when entity should be shown: all entities shown when no collection selected */
+  const isEntityVisible = useCallback(
+    (kind: CollectionRef['kind'], id: string): boolean => {
+      if (!activeCollection) return true;
+      return activeCollection.refs.some((r) => r.kind === kind && r.id === id);
+    },
+    [activeCollection]
+  );
+
+  return { getEntityColor, isEntityVisible };
 }

@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Alert,
   Box,
   Button,
   Container,
@@ -14,9 +15,9 @@ import {
   rem,
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconCheck, IconChevronDown, IconChevronUp, IconSelector, IconTrash, IconPlus, IconPencil, IconX } from '@tabler/icons-react';
-import { useState } from 'react';
-import { type Material, newMaterial, useAppContext } from '../store/AppContext';
+import { IconCheck, IconChevronDown, IconChevronUp, IconInfoCircle, IconSelector, IconTrash, IconPlus, IconPencil, IconX } from '@tabler/icons-react';
+import { useEffect, useState } from 'react';
+import { type Material, newMaterial, useAppContext, useEntityCollection } from '../store/AppContext';
 
 type Column = {
   key: keyof Material;
@@ -42,11 +43,35 @@ function SortIcon({ sorted, direction }: { sorted: boolean; direction: 'asc' | '
 }
 
 export function MaterialsPage() {
-  const { materials, setMaterials } = useAppContext();
+  const { materials, setMaterials, planes, updateElement, pendingCollectionLink, setPendingCollectionLink, activeCollectionId, activePlaneId } = useAppContext();
+  const { getEntityColor, isEntityVisible } = useEntityCollection();
   const [sort, setSort] = useState<SortState>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBuffer, setEditBuffer] = useState<Material | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Auto-create material + link to collection when navigated from action bubble
+  useEffect(() => {
+    console.log('[MaterialsPage] useEffect fired, pendingCollectionLink:', pendingCollectionLink);
+    if (!pendingCollectionLink || pendingCollectionLink.kind !== 'material') return;
+    const { collectionId, planeId } = pendingCollectionLink;
+    setPendingCollectionLink(null);
+
+    const m = newMaterial();
+    setMaterials((prev) => [...prev, m]);
+
+    const plane = planes.find((p) => p.id === planeId);
+    if (plane) {
+      const col = plane.elements.find((e) => e.id === collectionId);
+      if (col && col.type === 'collection') {
+        const updated = { ...col, refs: [...col.refs, { kind: 'material' as const, id: m.id }] };
+        updateElement(planeId, updated);
+      }
+    }
+
+    startEdit(m);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleSort = (key: keyof Material) => {
     setSort((prev) => {
@@ -57,18 +82,30 @@ export function MaterialsPage() {
     });
   };
 
-  const sorted = [...materials].sort((a, b) => {
-    if (!sort) return 0;
-    const av = a[sort.key].toLowerCase();
-    const bv = b[sort.key].toLowerCase();
-    const cmp = av.localeCompare(bv);
-    return sort.direction === 'asc' ? cmp : -cmp;
-  });
+  const sorted = [...materials]
+    .filter((m) => isEntityVisible('material', m.id))
+    .sort((a, b) => {
+      if (!sort) return 0;
+      const av = a[sort.key].toLowerCase();
+      const bv = b[sort.key].toLowerCase();
+      const cmp = av.localeCompare(bv);
+      return sort.direction === 'asc' ? cmp : -cmp;
+    });
 
   const addMaterial = () => {
     const m = newMaterial();
     setMaterials((prev) => [...prev, m]);
-    // Row is added inactive — user clicks the pencil icon to start editing
+    // Link to active collection if one is selected
+    if (activeCollectionId && activePlaneId) {
+      const plane = planes.find((p) => p.id === activePlaneId);
+      if (plane) {
+        const col = plane.elements.find((e) => e.id === activeCollectionId);
+        if (col && col.type === 'collection') {
+          updateElement(activePlaneId, { ...col, refs: [...col.refs, { kind: 'material' as const, id: m.id }] });
+        }
+      }
+    }
+    startEdit(m);
   };
 
   const startEdit = (m: Material) => {
@@ -133,16 +170,23 @@ export function MaterialsPage() {
               Delete ({selected.size})
             </Button>
           )}
-          <Button leftSection={<IconPlus size={16} />} onClick={addMaterial}>
+          <Button leftSection={<IconPlus size={16} />} onClick={addMaterial} disabled={!activeCollectionId}>
             Add Material
           </Button>
         </Group>
       </Group>
 
+      {!activeCollectionId && (
+        <Alert icon={<IconInfoCircle size={16} />} color="blue" mb="md">
+          Select or create a collection in the Organization tab to add materials.
+        </Alert>
+      )}
+
       <ScrollArea>
         <Table striped highlightOnHover withTableBorder withColumnBorders stickyHeader>
           <Table.Thead>
             <Table.Tr>
+              <Table.Th style={{ padding: 0, width: 6 }} />
               <Table.Th style={{ width: rem(36) }} />
               {COLUMNS.map((col) => (
                 <Table.Th key={col.key}>
@@ -164,8 +208,12 @@ export function MaterialsPage() {
           <Table.Tbody>
             {sorted.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={COLUMNS.length + 2}>
-                  <Text c="dimmed" ta="center" py="md">No materials yet. Click "Add Material" to get started.</Text>
+                <Table.Td colSpan={COLUMNS.length + 3}>
+                  <Text c="dimmed" ta="center" py="md">
+                    {materials.length === 0
+                      ? 'No materials yet. Click "Add Material" to get started.'
+                      : 'No materials in the selected collection.'}
+                  </Text>
                 </Table.Td>
               </Table.Tr>
             )}
@@ -176,6 +224,7 @@ export function MaterialsPage() {
                   key={material.id}
                   bg={selected.has(material.id) ? 'var(--mantine-color-blue-light)' : undefined}
                 >
+                  <Table.Td style={{ padding: 0, width: 6, minWidth: 6, background: getEntityColor('material', material.id) ?? 'transparent' }} />
                   <Table.Td>
                     <input
                       type="checkbox"

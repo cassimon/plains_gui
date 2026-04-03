@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Alert,
   Badge,
   Box,
   Button,
@@ -24,6 +25,7 @@ import {
   IconCheck,
   IconChevronDown,
   IconChevronRight,
+  IconInfoCircle,
   IconPencil,
   IconPlus,
   IconTrash,
@@ -36,7 +38,9 @@ import {
   type Solution,
   type SolutionComponent,
   useAppContext,
+  useEntityCollection,
 } from '../store/AppContext';
+import { useEffect } from 'react';
 
 // ── Component row (material + amount + unit) ──────────────────────────────────
 
@@ -151,9 +155,10 @@ type SolutionCardProps = {
   onDelete: () => void;
   materialOptions: { value: string; label: string }[];
   getMaterialName: (id: string) => string;
+  collectionColor?: string;
 };
 
-function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMaterialName }: SolutionCardProps) {
+function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMaterialName, collectionColor }: SolutionCardProps) {
   const [open, setOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameBuffer, setNameBuffer] = useState(solution.name);
@@ -199,7 +204,13 @@ function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMateri
   };
 
   return (
-    <Paper withBorder radius="md" p="sm" mb="sm">
+    <Paper
+      withBorder
+      radius="md"
+      p="sm"
+      mb="sm"
+      style={{ borderLeft: collectionColor ? `6px solid ${collectionColor}` : undefined }}
+    >
       <Group justify="space-between" wrap="nowrap">
         <Group gap="xs" wrap="nowrap" style={{ flex: 1 }}>
           <ActionIcon
@@ -309,7 +320,8 @@ function SolutionCard({ solution, onUpdate, onDelete, materialOptions, getMateri
 // ── Solutions page ────────────────────────────────────────────────────────────
 
 export function SolutionsPage() {
-  const { materials, solutions, setSolutions } = useAppContext();
+  const { materials, solutions, setSolutions, planes, updateElement, pendingCollectionLink, setPendingCollectionLink, activeCollectionId, activePlaneId } = useAppContext();
+  const { getEntityColor, isEntityVisible } = useEntityCollection();
 
   const materialOptions = materials.map((m) => ({
     value: m.id,
@@ -321,9 +333,42 @@ export function SolutionsPage() {
     return m ? (m.name || m.inventoryLabel || m.casNumber || id) : id;
   };
 
+  const visibleSolutions = solutions.filter((s) => isEntityVisible('solution', s.id));
+
   const addSolution = () => {
-    setSolutions((prev) => [...prev, newSolution()]);
+    const s = newSolution();
+    setSolutions((prev) => [...prev, s]);
+    if (activeCollectionId && activePlaneId) {
+      const plane = planes.find((p) => p.id === activePlaneId);
+      if (plane) {
+        const col = plane.elements.find((e) => e.id === activeCollectionId);
+        if (col && col.type === 'collection') {
+          updateElement(activePlaneId, { ...col, refs: [...col.refs, { kind: 'solution' as const, id: s.id }] });
+        }
+      }
+    }
   };
+
+  // Auto-create solution + link to collection when navigated from action bubble
+  useEffect(() => {
+    console.log('[SolutionsPage] useEffect fired, pendingCollectionLink:', pendingCollectionLink);
+    if (!pendingCollectionLink || pendingCollectionLink.kind !== 'solution') return;
+    const { collectionId, planeId } = pendingCollectionLink;
+    setPendingCollectionLink(null);
+
+    const s = newSolution();
+    setSolutions((prev) => [...prev, s]);
+
+    const plane = planes.find((p) => p.id === planeId);
+    if (plane) {
+      const col = plane.elements.find((e) => e.id === collectionId);
+      if (col && col.type === 'collection') {
+        const updated = { ...col, refs: [...col.refs, { kind: 'solution' as const, id: s.id }] };
+        updateElement(planeId, updated);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateSolution = (updated: Solution) => {
     setSolutions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
@@ -343,17 +388,27 @@ export function SolutionsPage() {
     <Container fluid>
       <Group justify="space-between" mb="md" mt="md">
         <Title order={2}>Solutions</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={addSolution}>
+        <Button leftSection={<IconPlus size={16} />} onClick={addSolution} disabled={!activeCollectionId}>
           New Solution
         </Button>
       </Group>
 
-      {solutions.length === 0 && (
-        <Text c="dimmed">No solutions yet. Click "New Solution" to get started.</Text>
+      {!activeCollectionId && (
+        <Alert icon={<IconInfoCircle size={16} />} color="blue" mb="md">
+          Select or create a collection in the Organization tab to add solutions.
+        </Alert>
+      )}
+
+      {visibleSolutions.length === 0 && activeCollectionId && (
+        <Text c="dimmed">
+          {solutions.length === 0
+            ? 'No solutions yet. Click "New Solution" to get started.'
+            : 'No solutions in the selected collection.'}
+        </Text>
       )}
 
       <Stack gap={0}>
-        {solutions.map((solution) => (
+        {visibleSolutions.map((solution) => (
           <SolutionCard
             key={solution.id}
             solution={solution}
@@ -361,6 +416,7 @@ export function SolutionsPage() {
             onDelete={() => deleteSolution(solution.id)}
             materialOptions={materialOptions}
             getMaterialName={getMaterialName}
+            collectionColor={getEntityColor('solution', solution.id) ?? undefined}
           />
         ))}
       </Stack>
