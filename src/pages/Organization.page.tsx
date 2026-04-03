@@ -21,18 +21,22 @@ import {
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import {
+  IconBold,
   IconBox,
   IconChartBar,
   IconCheck,
   IconDownload,
   IconFlask,
   IconFolderPlus,
+  IconItalic,
+  IconLetterT,
   IconMinus,
   IconNote,
   IconPlayerPlay,
   IconPlus,
   IconSeparatorVertical,
   IconTrash,
+  IconUnderline,
   IconX,
 } from '@tabler/icons-react';
 import {
@@ -48,9 +52,11 @@ import {
   type CanvasCollectionElement,
   type CanvasElement,
   type CanvasLineElement,
+  type CanvasPlainTextElement,
   type CanvasTextElement,
   type CollectionRef,
   type Plane,
+  type TextFormatting,
   type Vec2,
   useAppContext,
 } from '../store/AppContext';
@@ -327,6 +333,193 @@ function TextEl({
             <line x1="12" y1="8" x2="8" y2="12" stroke="#888" strokeWidth="1.5" />
           </svg>
         </div>
+      </div>
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plain Text element – transparent background with text formatting
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PlainTextEl({
+  el,
+  onUpdate,
+  onDelete,
+  onStartEdit,
+  onEditEnd,
+  pan,
+}: {
+  el: CanvasPlainTextElement;
+  onUpdate: (e: CanvasElement) => void;
+  onDelete: () => void;
+  onStartEdit?: () => void;
+  onEditEnd?: () => void;
+  pan: Vec2;
+}) {
+  const [editing, setEditing] = useState(el.content === '');
+  const [dragging, setDragging] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const dragStart = useRef<{ mouse: Vec2; origin: Vec2 } | null>(null);
+  const resizeStart = useRef<{ mouse: Vec2; size: Vec2 } | null>(null);
+
+  const startDrag = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    if (editing) return;
+    setDragging(true);
+    dragStart.current = { mouse: { x: ev.clientX, y: ev.clientY }, origin: { ...el.position } };
+    (ev.target as HTMLElement).setPointerCapture(ev.pointerId);
+  };
+
+  const onPointerMove = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    if (!dragging || !dragStart.current) return;
+    const dx = ev.clientX - dragStart.current.mouse.x;
+    const dy = ev.clientY - dragStart.current.mouse.y;
+    onUpdate({
+      ...el,
+      position: {
+        x: snapToGrid(dragStart.current.origin.x + dx),
+        y: snapToGrid(dragStart.current.origin.y + dy),
+      },
+    });
+  };
+
+  const stopDrag = () => { setDragging(false); dragStart.current = null; };
+
+  const startResize = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    ev.stopPropagation();
+    ev.preventDefault();
+    (ev.target as HTMLElement).setPointerCapture(ev.pointerId);
+    resizeStart.current = { mouse: { x: ev.clientX, y: ev.clientY }, size: { ...el.size } };
+  };
+
+  const onResizeMove = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    if (!resizeStart.current) return;
+    ev.stopPropagation();
+    const dx = ev.clientX - resizeStart.current.mouse.x;
+    const dy = ev.clientY - resizeStart.current.mouse.y;
+    onUpdate({
+      ...el,
+      size: {
+        x: Math.max(60, snapToGrid(resizeStart.current.size.x + dx)),
+        y: Math.max(24, snapToGrid(resizeStart.current.size.y + dy)),
+      },
+    });
+  };
+
+  const stopResize = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    ev.stopPropagation();
+    resizeStart.current = null;
+  };
+
+  // Calculate font size based on element height (responsive to resize)
+  const fontSize = Math.max(12, Math.min(48, el.size.y * 0.6));
+
+  const textStyle: React.CSSProperties = {
+    color: el.color,
+    fontWeight: el.formatting.bold ? 700 : 400,
+    fontStyle: el.formatting.italic ? 'italic' : 'normal',
+    textDecoration: el.formatting.underline ? 'underline' : 'none',
+    fontSize,
+    lineHeight: 1.2,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  };
+
+  return (
+    <Box
+      style={{
+        position: 'absolute',
+        left: el.position.x + pan.x,
+        top: el.position.y + pan.y,
+        width: el.size.x,
+        minHeight: el.size.y,
+        cursor: dragging ? 'grabbing' : editing ? 'text' : 'grab',
+        userSelect: 'none',
+        background: 'transparent',
+      }}
+      onPointerDown={startDrag}
+      onPointerMove={onPointerMove}
+      onPointerUp={stopDrag}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+    >
+      <div
+        style={{
+          width: '100%',
+          minHeight: el.size.y,
+          padding: '4px',
+          position: 'relative',
+          border: hovered || editing ? '1px dashed var(--mantine-color-gray-4)' : '1px dashed transparent',
+          borderRadius: 4,
+          transition: 'border 100ms',
+        }}
+      >
+        {/* Delete button – visible on hover */}
+        {hovered && !editing && (
+          <ActionIcon
+            size={16}
+            variant="transparent"
+            color="gray"
+            style={{ position: 'absolute', top: -8, right: -8, opacity: 0.7, zIndex: 1, background: 'white', borderRadius: '50%' }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={onDelete}
+          >
+            <IconX size={10} />
+          </ActionIcon>
+        )}
+
+        {/* Content */}
+        {editing ? (
+          <Textarea
+            autosize
+            autoFocus
+            size="xs"
+            minRows={1}
+            value={el.content}
+            onChange={(e) => onUpdate({ ...el, content: e.currentTarget.value })}
+            onBlur={() => { setEditing(false); onEditEnd?.(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            styles={{
+              input: {
+                background: 'transparent',
+                border: 'none',
+                resize: 'none',
+                ...textStyle,
+                padding: 0,
+              },
+            }}
+          />
+        ) : (
+          <div
+            style={{ ...textStyle, minHeight: 20, cursor: 'grab' }}
+            onDoubleClick={(e) => { e.stopPropagation(); setEditing(true); onStartEdit?.(); }}
+          >
+            {el.content || <Text span c="dimmed" size="xs" style={{ fontStyle: 'italic' }}>Double-click to edit…</Text>}
+          </div>
+        )}
+
+        {/* Resize handle – bottom right corner */}
+        {hovered && !editing && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              right: 0,
+              width: 12,
+              height: 12,
+              cursor: 'nwse-resize',
+              opacity: 0.6,
+            }}
+            onPointerDown={startResize}
+            onPointerMove={onResizeMove}
+            onPointerUp={stopResize}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12">
+              <line x1="12" y1="4" x2="4" y2="12" stroke="#888" strokeWidth="1.5" />
+              <line x1="12" y1="8" x2="8" y2="12" stroke="#888" strokeWidth="1.5" />
+            </svg>
+          </div>
+        )}
       </div>
     </Box>
   );
@@ -1290,10 +1483,10 @@ function DivisionOverlay({
 // Infinite-scroll canvas for one Plane
 // ─────────────────────────────────────────────────────────────────────────────
 
-type CanvasTool = 'select' | 'text' | 'line' | 'collection';
+type CanvasTool = 'select' | 'text' | 'plaintext' | 'line' | 'collection';
 
 function PlaneCanvas({ plane }: { plane: Plane }) {
-  const { updateElement, deleteElement, addTextElement, addLineElement, addCollectionElement, fuseCollections, updatePlane, setActiveCollectionId, activeCollectionId } =
+  const { updateElement, deleteElement, addTextElement, addPlainTextElement, addLineElement, addCollectionElement, fuseCollections, updatePlane, setActiveCollectionId, activeCollectionId } =
     useAppContext();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1316,7 +1509,11 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
   const [tool, setTool] = useState<CanvasTool>('select');
   // Start with a real color – gray default is not available for new elements
   const [selectedColor, setSelectedColor] = useState<string>(PALETTE[2]); // #74c0fc (light blue)
+  // Plain text formatting options (default: black text, no formatting)
+  const [textColor, setTextColor] = useState<string>('#000000');
+  const [textFormatting, setTextFormatting] = useState<TextFormatting>({ bold: false, italic: false, underline: false });
   const drawingLineId = useRef<string | null>(null);
+  const plaintextEditingRef = useRef(false);
 
   // ── Collection fusion state ────────────────────────────────────────────────────────────────
   // srcId = dragged collection, dstId = collection being hovered over
@@ -1530,12 +1727,23 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
     // clicking bare canvas background deselects active collection
     if (tool === 'select') setActiveCollectionId(null);
 
+    // For placement tools, only act on the bare canvas background - bail if clicking on an existing element
+    const isPlacementTool = tool === 'text' || tool === 'plaintext' || tool === 'collection';
+    if (isPlacementTool && e.target !== e.currentTarget) return;
+
     const pos = canvasCoords(e, containerRef, pan);
 
     if (tool === 'text') {
       const el = addTextElement(plane.id, pos);
       updateElement(plane.id, { ...el, color: selectedColor });
       setTool('select');
+    } else if (tool === 'plaintext') {
+      // Don't place if currently editing another plaintext element
+      if (plaintextEditingRef.current) return;
+      e.preventDefault(); // prevent canvas from stealing focus from the auto-focused Textarea
+      plaintextEditingRef.current = true; // mark as editing (new element auto-focuses)
+      addPlainTextElement(plane.id, pos, textColor, textFormatting);
+      // keep tool selected so formatting options stay visible
     } else if (tool === 'collection') {
       const el = addCollectionElement(plane.id, pos);
       updateElement(plane.id, { ...el, color: selectedColor });
@@ -1613,6 +1821,72 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
             <IconNote size={16} />
           </ActionIcon>
         </Tooltip>
+        <Tooltip label="Add plain text" position="bottom">
+          <ActionIcon variant={tool === 'plaintext' ? 'filled' : 'subtle'} style={toolStyle('plaintext')} onClick={() => setTool('plaintext')}>
+            <IconLetterT size={16} />
+          </ActionIcon>
+        </Tooltip>
+        {/* Text formatting options (visible when plaintext tool selected) */}
+        {tool === 'plaintext' && (
+          <>
+            <Divider orientation="vertical" />
+            <Tooltip label="Bold" position="bottom">
+              <ActionIcon
+                variant={textFormatting.bold ? 'filled' : 'subtle'}
+                color={textFormatting.bold ? 'blue' : 'gray'}
+                onClick={() => setTextFormatting((f) => ({ ...f, bold: !f.bold }))}
+              >
+                <IconBold size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Italic" position="bottom">
+              <ActionIcon
+                variant={textFormatting.italic ? 'filled' : 'subtle'}
+                color={textFormatting.italic ? 'blue' : 'gray'}
+                onClick={() => setTextFormatting((f) => ({ ...f, italic: !f.italic }))}
+              >
+                <IconItalic size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Underline" position="bottom">
+              <ActionIcon
+                variant={textFormatting.underline ? 'filled' : 'subtle'}
+                color={textFormatting.underline ? 'blue' : 'gray'}
+                onClick={() => setTextFormatting((f) => ({ ...f, underline: !f.underline }))}
+              >
+                <IconUnderline size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <Divider orientation="vertical" />
+            {/* Text color picker */}
+            <Popover withArrow shadow="md">
+              <Popover.Target>
+                <Tooltip label="Text color" position="bottom">
+                  <ActionIcon variant="subtle" color="gray">
+                    <ColorSwatch color={textColor} size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </Popover.Target>
+              <Popover.Dropdown p={6}>
+                <Stack gap={6}>
+                  <Text size="xs" c="dimmed">Text color</Text>
+                  <Group gap={4} wrap="wrap" w={120}>
+                    {/* Black + dark colors for text */}
+                    {['#000000', '#343a40', '#495057', '#868e96', '#fa5252', '#e64980', '#be4bdb', '#7950f2', '#4c6ef5', '#228be6', '#15aabf', '#12b886', '#40c057', '#82c91e', '#fab005', '#fd7e14'].map((c) => (
+                      <ColorSwatch
+                        key={c}
+                        color={c}
+                        size={24}
+                        style={{ cursor: 'pointer', outline: textColor === c ? '2px solid var(--mantine-color-blue-5)' : 'none', outlineOffset: 2 }}
+                        onClick={() => setTextColor(c)}
+                      />
+                    ))}
+                  </Group>
+                </Stack>
+              </Popover.Dropdown>
+            </Popover>
+          </>
+        )}
         <Tooltip label="Draw line (click start, click end)" position="bottom">
           <ActionIcon variant={tool === 'line' ? 'filled' : 'subtle'} style={toolStyle('line')} onClick={() => setTool('line')}>
             <IconMinus size={16} />
@@ -1660,6 +1934,7 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
         <Text size="xs" c="dimmed">
           {tool === 'select' && 'Select or drag to pan · Middle-mouse drag also pans'}
           {tool === 'text' && 'Click anywhere to place a sticky note'}
+          {tool === 'plaintext' && 'Click on empty canvas to place text · Double-click existing text to edit'}
           {tool === 'line' && 'Click to start line, move, click to end'}
           {tool === 'collection' && 'Click anywhere to place a Collection folder'}
         </Text>
@@ -1705,6 +1980,28 @@ function PlaneCanvas({ plane }: { plane: Plane }) {
                   el={el as CanvasTextElement}
                   onUpdate={(updated) => updateElement(plane.id, updated)}
                   onDelete={() => deleteElement(plane.id, el.id)}
+                  pan={pan}
+                />
+              );
+            }
+            if (el.type === 'plaintext') {
+              const ptel = el as CanvasPlainTextElement;
+              return (
+                <PlainTextEl
+                  key={el.id}
+                  el={ptel}
+                  onUpdate={(updated) => updateElement(plane.id, updated)}
+                  onDelete={() => deleteElement(plane.id, el.id)}
+                  onStartEdit={() => {
+                    plaintextEditingRef.current = true;
+                    setTool('plaintext');
+                    setTextColor(ptel.color);
+                    setTextFormatting(ptel.formatting);
+                  }}
+                  onEditEnd={() => {
+                    plaintextEditingRef.current = false;
+                    setTool('select');
+                  }}
                   pan={pan}
                 />
               );

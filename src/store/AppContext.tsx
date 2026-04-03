@@ -77,7 +77,7 @@ export function newComponent(): SolutionComponent {
 //   - The context surface (useAppContext) is the sole interface that a backend
 //     adapter needs to replace — swap useState for API calls without touching UI
 
-export type CanvasElementType = 'text' | 'line' | 'collection';
+export type CanvasElementType = 'text' | 'plaintext' | 'line' | 'collection';
 
 export type Vec2 = { x: number; y: number };
 
@@ -88,6 +88,22 @@ export type CanvasTextElement = {
   size: Vec2;
   content: string;
   color?: string;
+};
+
+export type TextFormatting = {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+};
+
+export type CanvasPlainTextElement = {
+  id: string;
+  type: 'plaintext';
+  position: Vec2;
+  size: Vec2;
+  content: string;
+  color: string; // text color, default black
+  formatting: TextFormatting;
 };
 
 export type CanvasLineElement = {
@@ -115,6 +131,7 @@ export type CanvasCollectionElement = {
 
 export type CanvasElement =
   | CanvasTextElement
+  | CanvasPlainTextElement
   | CanvasLineElement
   | CanvasCollectionElement;
 
@@ -130,6 +147,18 @@ export function newPlane(name?: string): Plane {
 
 function newTextElement(position: Vec2): CanvasTextElement {
   return { id: crypto.randomUUID(), type: 'text', position, size: { x: 200, y: 80 }, content: '' };
+}
+
+function newPlainTextElement(position: Vec2, color: string, formatting: TextFormatting): CanvasPlainTextElement {
+  return {
+    id: crypto.randomUUID(),
+    type: 'plaintext',
+    position,
+    size: { x: 200, y: 40 },
+    content: '',
+    color,
+    formatting,
+  };
 }
 
 function newLineElement(start: Vec2): CanvasLineElement {
@@ -148,7 +177,7 @@ function newCollectionElement(position: Vec2): CanvasCollectionElement {
   };
 }
 
-export { newTextElement, newLineElement, newCollectionElement };
+export { newTextElement, newPlainTextElement, newLineElement, newCollectionElement };
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
@@ -169,6 +198,7 @@ type AppContextValue = {
 
   // ── Element repository (operates on a specific plane) ─────────────────────
   addTextElement: (planeId: string, position: Vec2) => CanvasTextElement;
+  addPlainTextElement: (planeId: string, position: Vec2, color: string, formatting: TextFormatting) => CanvasPlainTextElement;
   addLineElement: (planeId: string, start: Vec2) => CanvasLineElement;
   addCollectionElement: (planeId: string, position: Vec2) => CanvasCollectionElement;
   updateElement: (planeId: string, element: CanvasElement) => void;
@@ -230,6 +260,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
     return el;
   }, []);
+
+  const addPlainTextElement = useCallback(
+    (planeId: string, position: Vec2, color: string, formatting: TextFormatting): CanvasPlainTextElement => {
+      const el = newPlainTextElement(position, color, formatting);
+      setPlanes((prev) =>
+        prev.map((p) => (p.id === planeId ? { ...p, elements: [...p.elements, el] } : p))
+      );
+      return el;
+    },
+    []
+  );
 
   const addLineElement = useCallback((planeId: string, start: Vec2): CanvasLineElement => {
     const el = newLineElement(start);
@@ -295,6 +336,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updatePlane,
         deletePlane,
         addTextElement,
+        addPlainTextElement,
         addLineElement,
         addCollectionElement,
         updateElement,
